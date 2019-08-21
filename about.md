@@ -14,6 +14,7 @@ Founder and Chief Software Architect at [Compute Software](https://www.computeso
 * Clojure(Script)
 * Kafka
 * Kubernetes
+* AWS
 
 ### Publication Lists
 * [https://www.researchgate.net/scientific-contributions/7329030_D_D_Dixon](https://www.researchgate.net/scientific-contributions/7329030_D_D_Dixon)
