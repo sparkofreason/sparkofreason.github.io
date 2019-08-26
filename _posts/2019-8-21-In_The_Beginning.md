@@ -62,4 +62,24 @@ if Rec.X > 5 {
 ```
 Is it still valid to send the result of the `textBox.onchange` event if `Rec.X` changes?
 
-# Unification
+# Observations
+
+## Dynamic Input
+
+The examples above all exhibit _dynamic inputs_, inputs that change with the execution or state of the system. A HTTP request often implies that we expect a response (assuming it isn't "fire and forget"). We provide a callback code which is executed *if* a response is received, and perhaps different code to handle errors. By making the request, we've created a new input to our system, a place where the "outside world" will provide some response. Event callbacks for UI elements are the same thing, and there are certainly other examples. 
+
+Let's call all such "dynamic inputs" _requests_.  A request is the abstraction that is requesting some input from the outside world, regardless of the implementation details. A _response_ is that input, and is always associated with a specific request. Assume the minimum about requests and responsees:
+
+* A request may never receive a response.
+* The order of responses to requests is not guaranteed.
+* A request might become invalid while a response is "in flight" (more on this below).
+
+## Stateful
+
+Requests are part of the system state. That state is generally implementation specific, and so to is what you can interrogate or modify, which can make testing a headache. For HTTP service requests, we might need to inject some sort of mock implementation of the service, which not only responded to requests with the appropriate data, but also verified that requests were made as required. Maybe we'd use Selenium or some other browser mock to drive testing of requests to the user interface, something else to mock message queues, and so forth.
+
+The state describing requests may also depend on program state. A request could be issued based on some condition. Some other request then receives a response that changes state rendering the first request invalid. But we have no control over the response arriving. Once a request is invalid, we need to ensure that the response is ignored, for example, don't execute the code in the callback. Otherwise we open the possibility of nasty race condition bugs, and the requirement to test such scenarios directly.
+
+## Coupling
+
+Requests represent places where our code interfaces with the outside world.
