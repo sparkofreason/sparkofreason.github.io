@@ -82,4 +82,11 @@ The state describing requests may also depend on program state. A request could 
 
 ## Coupling
 
-Requests represent places where our code interfaces with the outside world.
+Requests represent interfaces with the outside world, systems that are potnentially "far away" in both space and time, and not under our direct control. Coupling can occur in at least two ways
+
+1. Logical coupling, like the specifics of what is sent in an HTTP request or database query;
+2. Implementation coupling, such as how your language runtime and the OS wire up the handling of send an HTTP request and dealing with the response, if/when it comes.
+
+Abstractions which allow requests to appear as "normal" sequential code cause such coupling to occur deep in the guts of your code. I feel this is a questionable practice. Say you were building an electronic device, which perhaps allowed a user to input numbers, and had other interfaces which maybe sent signals to other devices, etc. You wouldn't build this thing where the keypad and other interface points were buried deep inside the device, requiring to to be disassmbled to be accessed. The same thing applies in code. Burying requests in your implementation makes it more difficult to both reason about and test. These points where we interface with users or other systems are generally critically important, and should be exposed on the "outside" of our system. 
+
+And unlike the electronic box analogy, the interfaces are potentially changing over time. Ideally we should be able to query the system and see exactly what requests are pending. That allows us to focus on business logic, without getting tangled up in the implementation details of interfacing with users or other external services and systems. The code which handles the actual implementation details of wiring up those requests can be separated from the business logic, and thus replaced ad hoc for testing. 
