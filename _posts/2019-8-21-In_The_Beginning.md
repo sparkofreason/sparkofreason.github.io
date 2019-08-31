@@ -77,9 +77,9 @@ Let's call all such "dynamic inputs" _requests_.  A request is the abstraction i
 
 ## Stateful
 
-Requests are part of the system state. That state is generally implementation specific, and so to is what you can interrogate or modify, which can make testing a headache. For HTTP service requests, we might need to inject some sort of mock implementation of the service, which not only responded to requests with the appropriate data, but also verified that requests were made as required. Maybe we'd use Selenium or some other browser mock to drive testing of requests to the user interface, something else to mock message queues, and so forth.
+Requests are part of the system state. That state is generally implementation specific, as is what you can interrogate or modify, which can make testing a headache. For HTTP service requests, we might need to inject some sort of mock implementation of the service, which not only responded to requests with the appropriate data, but also verified that requests were made as required. Maybe we'd use Selenium or some other browser mock to drive testing of requests to the user interface, something else to mock message queues, and so forth.
 
-The state describing requests may also depend on program state. A request could be issued based on some condition. Some other request then receives a response that changes state rendering the first request invalid. But we have no control over the response arriving. Once a request is invalid, we need to ensure that the response is ignored, for example, don't execute the code in the callback. Otherwise we open the possibility of nasty race condition bugs, and the requirement to test such scenarios directly.
+The state describing requests may also depend on program state. A request could be issued based on some condition. Some other request then receives a response that changes state rendering the first request invalid. But we have no control over the response arriving. Once a request is invalid, we need to ensure that the response is ignored, for example, don't execute the code in the callback. Otherwise we open the possibility of nasty race condition bugs, and must test such scenarios directly.
 
 ## Coupling
 
@@ -96,7 +96,7 @@ And unlike the electronic box analogy, the interfaces are potentially changing o
 
 ## Example
 
-We will use tic-tac-toe as our example. A human will compete against an AI via a browser client. The usual rules will apply, and additionally we will allow the human to reset the game if things aren't going well.
+We will use tic-tac-toe as our example. A human will compete against an AI service via a browser client. The usual rules will apply, and additionally we will allow the human to reset the game if things aren't going well.
 
 ## Design
 
@@ -104,7 +104,7 @@ A "component" in an R-cubed system could be anything with persistent state, dedi
 
 Each R-cubed component requires three pieces:
 
-1. Business Logic - Implementation of the logical requirements of your application. For tic-tac-toe, these include determining if the game is over (some player won or tie game), whose turn it is, or resetting the game state to start a new match. The business logic also maintains the state, and transformation of that state when a request receives a response. The state in the tic-tac-toe example would include the current game board (which squares are empty, or have an `X` or `O`), and the current set of valid requests. Requests will either be a `MoveRequest` for the current player and each empty square, and a `ResetRequest` when it is the human player's turn.
+1. Business Logic - Implementation of the logical requirements of your application. For tic-tac-toe, these include determining if the game is over (some player won or tie game), which player moves next, or resetting the game state to start a new match. The business logic also maintains the state, and transformation of that state when a request receives a response. The state in the tic-tac-toe example would include the current game board (which squares are empty, or have an `X` or `O`), and the current set of valid requests. Requests will either be a `MoveRequest` for the current player and each empty square, and a `ResetRequest` when it is the human player's turn.
 2. Effectors - Effectors implement effects based on the current business logic state. Effectors must therefore be able to query that state. The effectors for tic-tac-toe will be
     * UI - renders the current UI based on the business logic state, and wires up events for user inputs corresponding to valid requests.
     * AI - calls the AI service to get the next move when it's the computer's turn, handles the response.
