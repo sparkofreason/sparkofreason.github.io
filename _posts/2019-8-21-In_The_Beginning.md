@@ -87,6 +87,42 @@ Requests represent interfaces with the outside world, systems that are potnentia
 1. Logical coupling, like the specifics of what is sent in an HTTP request or database query;
 2. Implementation coupling, such as how your language runtime and the OS wire up the handling of send an HTTP request and dealing with the response, if/when it comes.
 
-Abstractions which allow requests to appear as "normal" sequential code cause such coupling to occur deep in the guts of your code. I feel this is a questionable practice. Say you were building an electronic device, which perhaps allowed a user to input numbers, and had other interfaces which maybe sent signals to other devices, etc. You wouldn't build this thing where the keypad and other interface points were buried deep inside the device, requiring to to be disassmbled to be accessed. The same thing applies in code. Burying requests in your implementation makes it more difficult to both reason about and test. These points where we interface with users or other systems are generally critically important, and should be exposed on the "outside" of our system. 
+Abstractions which allow requests to appear as "normal" sequential code cause such coupling to occur deep in the guts of your code. I feel this is a questionable practice. Say you were building an electronic device, which allowed a user to input numbers, and had other interfaces which maybe sent signals to other devices, etc. You wouldn't build this thing where the keypad and other interface points were buried deep inside the device, requiring to to be disassmbled to be accessed. The same thing applies in code. Burying requests in your implementation makes it more difficult to both reason about and test. These points where we interface with users or other systems are generally critically important, and should be exposed on the "outside" of our system. 
 
-And unlike the electronic box analogy, the interfaces are potentially changing over time. Ideally we should be able to query the system and see exactly what requests are pending. That allows us to focus on business logic, without getting tangled up in the implementation details of interfacing with users or other external services and systems. The code which handles the actual implementation details of wiring up those requests can be separated from the business logic, and thus replaced ad hoc for testing. 
+And unlike the electronic box analogy, the interfaces are potentially changing over time. Ideally we should be able to query the system and see exactly what requests are pending. And those requests should be abstracted as just data describing the request, explicitly part of the system state. That allows us to focus on business logic, without getting tangled up in the implementation details of interfacing with users or other external services and systems. The code which handles the actual implementation details of wiring up those requests can be separated from the business logic, and thus replaced ad hoc for testing. 
+
+# R-cubed: Reification of Request/Response
+
+## Example
+
+We will use tic-tac-toe as our example. A human will compete against an AI via a browser client. The usual rules will apply, and additionally we will allow the human to reset the game if things aren't going well.
+
+## Design
+
+A "component" in an R-cubed system could be anything with persistent state, dedicated business rules, and interfaces. The boundaries of what comprises a component are a design decision, but obvious candidates would be UI clients and stateful microservices. The actor model may be helpful in thinking about components, since the state of the component should only be updated by responses to requests resulting from the business logic applied to the current state. 
+
+Each R-cubed component requires three pieces:
+
+1. Business Logic - Implementation of the logical requirements of your application. For tic-tac-toe, these include determining if the game is over (some player won or tie game), whose turn it is, or resetting the game state to start a new match. The business logic also maintains the state, and transformation of that state when a request receives a response. The state in the tic-tac-toe example would include the current game board (which squares are empty, or have an `X` or `O`), and the current set of valid requests. Requests will either be a `MoveRequest` for the current player and each empty square, or a `ResetRequest` when it is the human player's turn.
+2. Effectors - Effectors implement effects based on the current business logic state. The effectors for tic-tac-toe will be
+    * UI - renders the current UI based on the business logic state, and wires up events for user inputs corresponding to valid requests.
+    * AI - calls the AI service to get the next move, handles the response.
+Effectors must be able to query the current business logic state.
+3. Data flow - some implementation which allows effectors to 
+    * Get updated query results when business logic state is changed
+    * Provide responses to requests back to the business logic.
+
+An R-cubed component has the following lifecycle:
+
+1. Initialize business logic state
+2. Effectors run queries against current state
+3. Effects (rendering UI, HTTP requests, etc.) are performed based on query results.
+4. Wait until a response is received from a pending request.
+5. Send the response to the business logic.
+6. Business logic updates state based on response data.
+7. Goto (2) until component is terminated.
+
+Business logic state updates from responses must be serialized, i.e. each update must run to completion before processing another response. Race conditions are thus avoided, as the state changes from a response may invalidate other pending requests.
+
+## Implementation
+
