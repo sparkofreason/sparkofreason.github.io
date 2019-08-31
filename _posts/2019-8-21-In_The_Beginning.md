@@ -68,9 +68,10 @@ Is it still valid to send the result of the `textBox.onchange` event if `Rec.X` 
 
 The examples above all exhibit _dynamic inputs_, inputs that change with the execution or state of the system. A HTTP request often implies that we expect a response (assuming it isn't "fire and forget"). We provide a callback code which is executed *if* a response is received, and perhaps different code to handle errors. By making the request, we've created a new input to our system, a place where the "outside world" will provide some response. Other examples include event callbacks for UI elements, handlers for message queues, and so forth. Abstractly, these are all the same. 
 
-Let's call all such "dynamic inputs" _requests_.  A request is the abstraction indicating our program can receive some input from the outside world, regardless of the implementation details. A _response_ is that input, and is always associated with a specific request. Assume the minimum about requests and responsees:
+Let's call all such "dynamic inputs" _requests_.  A request is the abstraction indicating our program can receive some input from the outside world, regardless of the implementation details. A _response_ is that input. Assume the minimum about requests and responsees:
 
 * A request might not receive a response.
+* A response is always associated with a specific request instance.
 * The order of responses to requests is not guaranteed.
 * A request might become invalid while a response is "in flight" (more on this below).
 
