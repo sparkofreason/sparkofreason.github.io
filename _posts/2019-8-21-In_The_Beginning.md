@@ -126,3 +126,31 @@ Business logic state updates from responses must be serialized, i.e. each update
 
 ## Implementation
 
+### Enforcing Logical Constraints
+
+Before diving into the specifics of the tic-tac-toe implementation, we examine some further choices to be made around the implementation of the business logic. Effectors and data flow are pretty much just "plumbing", and you will choose the techniques and implementations best suited for your particular effects, programming language, and runtime requirements. The business logic is often the "money code" (hence the name), and bugs there tend to hurt. Consider the following scenario in our tic-tac-toe game:
+
+1. Human makes a move
+2. A request is sent to the AI service to get the computer's move
+3. Human realizes they chose badly, and pushes the Reset button before the response is received from the AI.
+4. Board resets to a new game
+5. Response is received from the AI
+
+What happens at step (5)? The correct action would be to ignore the response, which means we removed or otherwise invalidated the associated `MoveRequest` from the business logic state. We could just be careful to write code to do that explicitly: when Reset is pushed, delete all of the `MoveRequest`'s. What if additional functionality were added to future versions that could invalidate requests to the AI? We'd have to be disciplined enough to delete the `MoveRequest`'s there as well.
+
+Words like "careful" and "disciplined", when applied to programming, imply a high likelihood of creating incorrect code. Why do tools like static type checkers or runtime data validators exist? So you don't have to be careful. You could write code with no type validation whatsoever, try to remember the type of every variable, shape of every compound data structure, signature of every function, and so forth. But why? That's the kind of shit computers are really good at: ensuring constraints are not violated, everywhere and always. Such tools allow us to dedicate more mental energy to the stuff that rings the cash register, implementing the business requirements.
+
+The constraints we're interested in here are not about data per se, but logical statements of the form `if X then assert Y`, where `X` and `Y` are logical assertions based on the business logic state. An example could be `if x == 5 then assert y == -1`. When the value of `x` becomes `5`, we want the state to contain the fact that `y` has the value `-1`, which may imply a state change. If `x` subsequently became `4`, we want to retract the previously asserted fact `y == -1`. Returning to our tic-tac-toe example: `if player == computer AND square_5 == empty then assert MoveRequest(player == computer, square == square_5)`. If the condition becomes false by hitting Reset (or any other cause), the `MoveRequest` will be retracted, thus avoiding the race condition with the AI service response.
+
+The general classification of such functionality is called [logic programming](https://en.wikipedia.org/wiki/Logic_programming). The specific type of logic programming we will employ is [foward chaining rules](https://en.wikipedia.org/wiki/Logic_programming) with [truth maintenance](https://en.wikipedia.org/wiki/Reason_maintenance).
+
+### Maali
+
+[Maali](https://github.com/Provisdom/maali) is a Clojure library, built on the excellent [clara-rules](http://www.clara-rules.org/) library. clara-rules is an implementation of forward-chaining rules with truth maintenancy. Maali adds some functionality which I found useful for R-cubed:
+
+1. clara-rules defaults to using Clojure `defrecord`'s (essentially typed Java objects) to represent fact data. Maali uses Clojure maps, with [Clojure spec](https://clojure.org/guides/spec) used to define fact "types" and perform runtime validation. spec provides more flexible validation than the simple struct-like type constraints of a `defrecord`, and we used it throughout our code for other purposes.
+2. clara-rules defines rules as Clojure `var`'s via the `defrule` macro, and groups them under Clojure namespaces. Maali allows collections of rules to be defined under a single `var` with a `defrules` macro. Correspondingly, session creation in clara-rules specifies the namespaces containing the rules included in the session, while in Maali you just provide the rule collection vars. The same applies to queries, e.g. `defquery` -> `defqueries`. (Aside: I think this choice was mostly a matter of personal preference, though it may have facilitated dynamic reloading of rules in ClojureScript, a la figwheel.)
+3. Maali provides some specific tooling around R-cubed for wiring up data flow, creating requests, handling responses, and dealing with cancellation.
+4. Maali provides a base set of rules for maintaining logical consistency of requests/responses.
+
+
