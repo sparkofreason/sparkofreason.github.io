@@ -146,9 +146,9 @@ The general classification of such functionality is called [logic programming](h
 
 ### Maali
 
-[Maali](https://github.com/Provisdom/maali) is a Clojure library, built on the excellent [clara-rules](http://www.clara-rules.org/) library. clara-rules is an implementation of forward-chaining rules with truth maintenancy. Maali adds some functionality which I found useful for R-cubed:
+[Maali](https://github.com/Provisdom/maali) is a Clojure library, built on the excellent [clara-rules](http://www.clara-rules.org/) library. clara-rules is an implementation of forward-chaining rules with truth maintenance. Maali adds some functionality which I found useful for R-cubed:
 
-1. clara-rules defaults to using Clojure `defrecord`'s (essentially typed Java objects) to represent fact data. Maali uses Clojure maps, with [Clojure spec](https://clojure.org/guides/spec) used to define fact "types" and perform runtime validation. spec provides more flexible validation than the simple struct-like type constraints of a `defrecord`, and we used it throughout our code for other purposes.
+1. clara-rules defaults to using Clojure `defrecord`'s (essentially typed Java objects) to represent fact data. Maali uses Clojure maps, with [Clojure spec](https://clojure.org/guides/spec) used to define fact "types" and perform runtime validation. spec provides more flexible validation than the simple struct-like type constraints of a `defrecord`, and we use it throughout our code for other purposes. Spec doesn't play well with `defrecord` either.
 2. clara-rules defines rules as Clojure `var`'s via the `defrule` macro, and groups them under Clojure namespaces. Maali allows collections of rules to be defined under a single `var` with a `defrules` macro. Correspondingly, session creation in clara-rules specifies the namespaces containing the rules included in the session, while in Maali you just provide the rule collection vars. The same applies to queries, e.g. `defquery` -> `defqueries`. (Aside: I think this choice was mostly a matter of personal preference, though it may have facilitated dynamic reloading of rules in ClojureScript, a la figwheel.)
 3. Maali provides some specific tooling around R-cubed for wiring up data flow, creating requests, handling responses, and dealing with cancellation.
 4. Maali provides a base set of rules for maintaining logical consistency of requests/responses.
@@ -187,7 +187,7 @@ The Clojure DSL used to define rules and queries in Maali is largely the same as
 )
 ```
 
-Here are the rules used for request/response for the Reset functionality. The full code can be viewed in the [maali-simple](https://github.com/Provisdom/maali-simple/blob/master/src/provisdom/simple/rules.cljc#L93-L111) repository. The `defrules` macro accepts one or more rule definitions. A rule definition is a vector defined as
+Here are the rules used for request/response for the tic-tac-toe moves. The full code can be viewed in the [maali-simple](https://github.com/Provisdom/maali-simple/blob/master/src/provisdom/simple/rules.cljc) repository. The `defrules` macro accepts one or more rule definitions. A rule definition is a vector defined as
 
 1. The rule name. Clojure's namespaced keywords are handy here, since rule names must be unique. I like suffixing rule names with `!` because they represent conditional state transitions. Queries simply bind data with no state change, so no `!` on query names.
 2. An optional doc string.
@@ -201,7 +201,7 @@ The `::reset-board-request!` rule is read as
     * No fact of type `::GameOver` exists;
     * AND Bind the value of the `::player` attribute of the `::CurrentPlayer` entity to the `?player` variable;
     * AND Bind all of the existing `::Move` entities to the `?moves` variable;
-    * AND Bind the `?response-fn`variable to the value of the `:response-fn` attribute on the `::common/ResponseFunction` entity.
+    * AND Bind the `?response-fn` variable to the value of the `:response-fn` attribute on the `::common/ResponseFunction` entity.
 * *THEN*
     * Conditionally insert a new `::MoveRequest`'s (constructed using the `common/request` function) for all squares not containing a move.
 
@@ -209,11 +209,11 @@ Note that `common` is an alias for the `provisdom.maail.common` namespace, and `
 
 The `then` part of our rule inserts `::MoveRequest`'s for the empty squares and the current player. These fact entities are maps with an associated spec `::MoveRequest` that serves as the "type" of the entity. The `insert!` function in clara-rules does not require the entity type to be explicitly stated. For `defrecords`, the type is just part of the object metadata. The Maali functions which manipulate fact entities require the entity type to be explicitly specified, and the provided data is validated against the spec.  The insert in this case is _conditional_, which means that it is subject to truth maintenance. If bindings/conditions in the `if` clauses were to change, then the `::MoveRequest`'s would be automatically retracted. Had we inserted this fact directly into the session (without it being part of a rule), or had we used the `insert-unconditional!` function, the fact would not be managed by truth maintenance.
 
-The conditional vs. unconditional point is important in R-cubed. Requests will generally be conditional, reflecting the dependence of the valid inputs on the business logic state. Responses, however, come from the "outside world". Responses don't depend on anything in your business logic, and are _unconditional_, inserted directly into the rules session working memory. The logical consequence is that facts asserted as part of a response rule are unconditional as well. Look at the `::move-response! rule:
+The conditional vs. unconditional point is important in R-cubed. Requests will usually (always?) be conditional, reflecting the dependence of the valid inputs on the business logic state. Responses, however, come from the "outside world". Responses don't depend on anything in your business logic, and are _unconditional_, inserted directly into the rules session working memory. The logical consequence is that facts asserted as part of a response rule are unconditional as well. Look at the `::move-response! rule:
 
 * *IF* we can
     * Bind the request of type `::MoveRequest` to the `?request` variable, and the `::position` attribute of the `::MoveRequest` to `?position`; 
-    * AND find a `::MoveResponse` whose `::common/Request` attribute matches `?request`, `::position` attribute matches `?position`, and binds `?player` to `::player;
+    * AND find a `::MoveResponse` whose `::common/Request` attribute matches `?request`, `::position` attribute matches `?position`, and binds `?player` to `::player`;
     * AND Bind `?current-player` to the `::CurrentPlayer` fact entity;
 * *THEN*
     * Do an unconditional insert of a `::Move` for the `?position` and `?player` specified in the response;
@@ -225,7 +225,7 @@ The `upsert!` on `::CurrentPlayer` is similar. `::CurrentPlayer` starts as an in
 
 ```clj
 (rules/retract! ::CurrentPlayer ?current-player)
-(rules/insert-unconditional! ::CurrentPlayer (assoc ?current-player ::player ?player))
+(rules/insert-unconditional! ::CurrentPlayer (assoc ?current-player ::player (next-player ?player)))
 ```
 
 We don't bother suffixing `rules/upsert!` with `-unconditional`, because logically all upserts *must* be unconditional. Here's what happens `insert-unconditional!` above were replaced with `insert!`:
@@ -281,7 +281,7 @@ This covers two scenarios:
 
 ### Effectors
 
-A key part of R-cubed is the separation of the code performing effects from the logic requesting those effects. This likely requires some "disclipline". Most programming languages don't provide a way to guarantee that business logic code contains no effects. Maali (and the underlying clara-rules) allows you to right arbitrary Clojure code in the `then` part of the rule, so you could do all kinds of stuff there, like mutating the UI, putting stuff in a database, etc. Don't do that. Restrict the `then` clauses to the following (for Maali, or equivalent operations in your language)
+A key part of R-cubed is the separation of the code performing effects from the logic requesting those effects. This likely requires some "disclipline". Most programming languages don't provide a way to guarantee that business logic code contains no effects. Maali (and the underlying clara-rules) allows you to write arbitrary Clojure code in the `then` part of the rule, so you could do all kinds of stuff there, like mutating the UI, putting stuff in a database, etc. Don't do that. Restrict the `then` clauses to the following (for Maali, or equivalent operations in your language)
 
 * `insert!`
 * `insert-unconditional!`
@@ -340,9 +340,9 @@ The `click-handler` function is going to provide the response to a user click on
 ```
 `def-derive` is a macro defined in `provisdom.maali.rules` which defines a Clojure spec and establishes an "is a" relationship with some other spec (via Clojure's `derive` function). So a `::MoveRequest` is an instance of `::common/Request` with additional attributes `::player` and `::position`. That hierarchy proves handy sometimes, in particular allowing us to write a generic `::retract-orphan-response!` rule that applies to all entities deriving from `::common/Request` and `::common/Response`. 
 
-The `common/respond-to` function is a helper that allows effectors to be ignorant of the data flow wiring. All that is required is to call it with the request and response, assuming the request was created with the `common/request` function as we showed above. We don't show it here, but that will insert the response, fire the rules, and alert the effectors that the business logic state has changed.
+The `common/respond-to` function is a helper that allows effectors to be ignorant of the data flow wiring. All that is required is to call it with the request and response, assuming the request was created with the `common/request` function as we showed above. We don't show it here, but this will insert the response, fire the rules, and alert the effectors that the business logic state has changed.
 
-The `tile` function is responsible for the rendering and event-handling (when relevant). `tile` is called from another function which is rendering the board as an HTML table, and so returns the markup (as hiccup) for a `<td>` element. The `session` argument contains the business logic state, and `position` is the board position of the square being rendered. `provisdom.maali.rules/query-one` is a convenience method which executes a query against the business logic state and returns the first result (useful when you know there will only ever be a single result). The relevant queries for `tile` are (from `provisdom.maali-simple.rules`):
+The `tile` function is responsible for the rendering and event-handling (when relevant). `tile` is called from another function which is rendering the board as an HTML table, and so returns the markup (as [hiccup](https://github.com/weavejester/hiccup/wiki/Syntax)) for a `<td>` element. The `session` argument contains the business logic state, and `position` is the board position of the square being rendered. `provisdom.maali.rules/query-one` is a convenience method which executes a query against the business logic state and returns the first result (useful when you know there will only ever be a single result). The relevant queries for `tile` are (from `provisdom.maali-simple.rules`):
 
 ```clj
 (defqueries queries
@@ -374,7 +374,7 @@ The purpose of testing software is to inform our beliefs about "correctness", th
 
 First, remember that while forward-chaining and truth maintenance simplifies R-cubed implementations, they aren't strictly required. But we accrue an additional benefit by declaring business logic as rules. Looking at the rule definitions, they very much resemble the sort of conditional statements employed in various testing scenarios. Suppose that we weren't using rules, and instead of having the `::move-request!` rule we had a `move-requests` function which took in the current state and returned the valid move requests. We then might write some unit tests for `move-requests`, supplying various test-cases, and then checking the output with conditional statements. Those conditions would appear very much the same as the rule definition. This is key: forward chaining with truth maintenance implies that the runtime guarantees the assertions to follow from the conditions, at least at the scope of a single rule. So we don't need to test that directly. Now, it may be that when combined with other rules, you induce some logical contradiction. Using rules doesn't get you out of testing, but it does provide some guarantees at a lower level, and allows more testing effort to be spent at a level more like "integration testing", where nastier bugs are likely to surface. Such bugs are often the result of logical contradictions between rules, which tend to be very obvious, for example, when firing the rules truth maintenance won't converge, but bounces back and forth between the offending rules.
 
-Rules aside, R-cubed facilitates direct testing of the business logic. Effects have been completely removed from the business logic. The requests for effects are simply as business logic state, and where applicable responses are just supplied as data. The implementation specifics of the effects are decomplected. The connection between business logic and effectors can (should?) be set at runtime, as determined by your data flow. Swapping out effector implementations for test mocks (or any alternative implementation) is therefore straightforward, without requiring we drag in dependency injection, mocking frameworks, and the like. The business logic itself is intrinsically synchronous and pure. Asynchronous handling is pushed to the effectors. For any state, we can ask for the set of pending requests, and assuming we have sufficient metadata describing the expected responses, can randomly and automatically provide response data. Some example test code for tic-tac-toe is shown below:
+Rules aside, R-cubed facilitates direct testing of the business logic. Effects have been completely removed from the business logic. The requests for effects are data, contained in the business logic state, and where applicable responses are just supplied as data. The implementation specifics of the effects are decomplected. The connection between business logic and effectors can (should?) be set at runtime, as determined by your data flow. Swapping out effector implementations for test mocks (or any alternative implementation) is therefore straightforward, without requiring we drag in dependency injection, mocking frameworks, and the like. The business logic itself is intrinsically synchronous and pure. Asynchronous handling is pushed to the effectors. For any state, we can ask for the set of pending requests, and assuming we have sufficient metadata describing the expected responses, can randomly and automatically provide response data. Some example test code for tic-tac-toe is shown below:
 
 ```clj
 ;;; TESTING
@@ -444,7 +444,7 @@ Rules aside, R-cubed facilitates direct testing of the business logic. Effects h
 
 We can further expand the scope of integration testing to include effectors, if/when it makes sense. A good example would be to connect the view effector, let it run, and watch for exceptions, indications of rendering errors, or whatever. [This video shows the results applied to tic-tac-toe](https://www.loom.com/share/b4f27647e35b4447b71d6a2ba2b14612). About the first half of the video has a longish delay between iterations, while the second half reduces this. We can take it even further, and interact with the UI while the simulation is running, as shown in [this video](https://www.loom.com/share/2acfcc211f4f49bb99f06dee4f3176c6).
 
-The tic-tac-toes application doesn't require any sort of generation of response data. The only input is click events (or equivalently the move choice from the AI service), and so the request data completely determines the response. The Maali implementation of TodoMVC does utilize generation of response data based both on response specs and request data:
+The tic-tac-toe application doesn't require any sort of generation of response data. The only input is click events (or equivalently the move choice from the AI service), and so the request data completely determines the response. The Maali implementation of TodoMVC does utilize generation of response data based both on response specs and request data:
 
 ```clj 
 (def request->response
