@@ -153,4 +153,224 @@ The general classification of such functionality is called [logic programming](h
 3. Maali provides some specific tooling around R-cubed for wiring up data flow, creating requests, handling responses, and dealing with cancellation.
 4. Maali provides a base set of rules for maintaining logical consistency of requests/responses.
 
+The Clojure DSL used to define rules and queries in Maali is largely the same as that in the underlying clara-rules, so most of the [clara-rules documentation](http://www.clara-rules.org/docs/firststeps/) applies. Differences will be highlighted in the code examples below.
 
+### R-cubed in Maali
+
+```clj
+(defrules
+  ...
+  [::move-request!
+   "If the game isn't over, request ::Moves from the ::CurrentPlayer for
+    eligible squares."
+   [:not [::GameOver]]
+   [::CurrentPlayer (= ?player player)]
+   [?moves <- (acc/all) :from [::Move]]
+   [::common/ResponseFunction (= ?response-fn response-fn)]
+   =>
+   (let [all-positions (set (range 9))
+         empty-positions (set/difference  all-positions (set (map ::position ?moves)))
+         requests (map #(common/request {::position % ::player ?player} ::MoveResponse ?response-fn) empty-positions)]
+     (apply rules/insert! ::MoveRequest requests))]
+
+  [::move-response!
+   "Handle response to ::MoveRequest by inserting a new ::Move and switch
+    ::CurrentPlayer to the opponent."
+   [?request <- ::MoveRequest (= ?position position)]
+   [::MoveResponse (= ?request Request) (= ?position position) (= ?player player)]
+   [?current-player <- ::CurrentPlayer]
+   =>
+   (rules/insert-unconditional! ::Move {::position ?position ::player ?player})
+   (rules/upsert! ::CurrentPlayer ?current-player assoc ::player (next-player ?player))]
+
+  ...
+)
+```
+
+Here are the rules used for request/response for the Reset functionality. The full code can be viewed in the [maali-simple](https://github.com/Provisdom/maali-simple/blob/master/src/provisdom/simple/rules.cljc#L93-L111) repository. The `defrules` macro accepts one or more rule definitions. A rule definition is a vector defined as
+
+1. The rule name. Clojure's namespaced keywords are handy here, since rule names must be unique. I like suffixing rule names with `!` because they represent conditional state transitions. Queries simply bind data with no state change, so no `!` on query names.
+2. An optional doc string.
+3. One or more clauses (the `if` part of the rule)
+4. The symbol `=>` (read as `then` or `implies`).
+5. Assertions (or general effects, more on that below.)
+
+The `::reset-board-request!` rule is read as
+
+* *IF*
+    * No fact of type `::GameOver` exists;
+    * AND Bind the value of the `::player` attribute of the `::CurrentPlayer` entity to the `?player` variable;
+    * AND Bind all of the existing `::Move` entities to the `?moves` variable;
+    * AND Bind the `?response-fn`variable to the value of the `:response-fn` attribute on the `::common/ResponseFunction` entity.
+* *THEN*
+    * Conditionally insert a new `::MoveRequest`'s (constructed using the `common/request` function) for all squares not containing a move.
+
+Note that `common` is an alias for the `provisdom.maail.common` namespace, and `rules` aliases `provisdom.maali.rules`. The `::` syntax in Clojure is shorthand for "use the current namespace on this keyword", so `::move-request!` expands to `:provisdom.simple.rules/move-request!`. The stuff around `::common/ResponseFunction` is a convenience for wiring up the data flow dynamically, basically allows effectors to provide a response to a specific request without having to know about the details of the rules code.
+
+The `then` part of our rule inserts `::MoveRequest`'s for the empty squares and the current player. These fact entities are maps with an associated spec `::MoveRequest` that serves as the "type" of the entity. The `insert!` function in clara-rules does not require the entity type to be explicitly stated. For `defrecords`, the type is just part of the object metadata. The Maali functions which manipulate fact entities require the entity type to be explicitly specified, and the provided data is validated against the spec.  The insert in this case is _conditional_, which means that it is subject to truth maintenance. If bindings/conditions in the `if` clauses were to change, then the `::MoveRequest`'s would be automatically retracted. Had we inserted this fact directly into the session (without it being part of a rule), or had we used the `insert-unconditional!` function, the fact would not be managed by truth maintenance.
+
+The conditional vs. unconditional point is important in R-cubed. Requests will generally be conditional, reflecting the dependence of the valid inputs on the business logic state. Responses, however, come from the "outside world". Responses don't depend on anything in your business logic, and are _unconditional_, inserted directly into the rules session working memory. The logical consequence is that facts asserted as part of a response rule are unconditional as well. Look at the `::move-response! rule:
+
+* *IF* we can
+    * Bind the request of type `::MoveRequest` to the `?request` variable, and the `::position` attribute of the `::MoveRequest` to `?position`; 
+    * AND find a `::MoveResponse` whose `::common/Request` attribute matches `?request`, `::position` attribute matches `?position`, and binds `?player` to `::player;
+    * AND Bind `?current-player` to the `::CurrentPlayer` fact entity;
+* *THEN*
+    * Do an unconditional insert of a `::Move` for the `?position` and `?player` specified in the response;
+    * AND Update the `::CurrentPlayer` entity to be the other player.
+
+The `::MoveResponse` is the input received from either the human or AI service. The resulting `::Move` fact is thus necessarily unconditional, because its existence and value depends *only* on the response, not on the rest of the state. To further that point: once we're done with the `::MoveResponse`, we're going to delete it (we'll see how below), because we don't want stale input hanging around. If `::Move` were logically dependent on `::MoveResponse`, then deleting `::MoveResponse` would cause truth maintenance to retract the `::Move`, and the game would never progress past an empty board. A benefit of using forward-chaining rules in R-cubed is the explicit specification of which data is a logical consequence of the current state, and what follows from external input.
+
+The `upsert!` on `::CurrentPlayer` is similar. `::CurrentPlayer` starts as an initial fact inserted into the session when the game is started, and so is unconditional. The `upsert!` function is essentially a shortcut for the following:
+
+```clj
+(rules/retract! ::CurrentPlayer ?current-player)
+(rules/insert-unconditional! ::CurrentPlayer (assoc ?current-player ::player ?player))
+```
+
+We don't bother suffixing `rules/upsert!` with `-unconditional`, because logically all upserts *must* be unconditional. Here's what happens `insert-unconditional!` above were replaced with `insert!`:
+
+* The current value of the `::CurrentPlayer` fact is bound to `?current-player`.
+* `?current-player` is retracted.
+* A new value of `::CurrentPlayer` is inserted.
+* Truth maintenance sees that the `?current-player` binding for the `if` clauses in this rule has changed, and so retracts the newly inserted `::CurrentPlayer` value.
+
+So `upsert!` is always unconditional. To be otherwise would lead to logical contradictions in your rules, essentially stating "`X` implies `not X`".
+
+We noted above that requests are conditional, and subject to truth maintenance. The `::MoveRequest`'s created by the `::move-request!` will be automatically retracted whenever the `if`-bindings modified:
+
+* The value of the `::CurrentPlayer` changes
+* OR The current set of `::Move`'s changes
+
+(Technically, also add OR the `::ResponseFunction` changes, but that shouldn't happen). So, when the `::move-response!` rule fires, all of the (now stale) `::MoveRequest` facts will be retracted automagically by truth maintenance, which saves us some bookkeeping code. `::MoveResponse` however is unconditional, and unless we explicitly retract it, is going to hang around. This is a memory leak if nothing else, and could cause further problems by spuriously firing rules with old input. We could be "disciplined" and explicitly retract the response fact in any rule that processes responses, but that's just asking for bugs.
+
+Instead we can include rules that establish the logical relationships between requests and responses. From `provisdom.maali.common`:
+
+```clj
+;;; Common rules for request/response logic.
+(defrules rules
+  [::cancel-request!
+   "Cancellation is a special response that always causes the corresponding
+    request to be retracted. Note that the ::retract-orphan-response! rule
+    below will then cause the cancellation fact to also be retracted."
+   [?request <- ::Cancellable]
+   [::Cancellation (= ?request Request)]
+   =>
+   (rules/retract! (rules/spec-type ?request) ?request)]
+
+  [::retract-orphan-response!
+   "Responses are inserted unconditionally from outside the rule engine, so
+    explicitly retract any responses without a corresponding request."
+   [?response <- ::Response (= ?request Request)]
+   [:not [?request <- ::Request]]
+   =>
+   (rules/retract! (rules/spec-type ?response) ?response)])
+```
+
+We won't discuss `::cancel-request!` here. `::retract-orphan-response!` is the rule of interest:
+
+* *IF* we can
+    * Find a `::Response` fact with an associated `::Request` attribute bound to `?request`;
+    * AND there exists no `::Request` entity in the state with the value `?request`;
+* *THEN*
+    * Retract the response.
+
+This covers two scenarios:
+* We processed a response, which changed the state such that the request was retracted. `::retract-orphan-response!` ensures that the response entity is also retracted.
+* Something else invalidated the request while the response was "in flight" from an external source, in which case when the effector inserts the response it gets automatically removed, avoiding potential race conditions.
+
+### Effectors
+
+A key part of R-cubed is the separation of the code performing effects from the logic requesting those effects. This likely requires some "disclipline". Most programming languages don't provide a way to guarantee that business logic code contains no effects. Maali (and the underlying clara-rules) allows you to right arbitrary Clojure code in the `then` part of the rule, so you could do all kinds of stuff there, like mutating the UI, putting stuff in a database, etc. Don't do that. Restrict the `then` clauses to the following (for Maali, or equivalent operations in your language)
+
+* `insert!`
+* `insert-unconditional!`
+* `retract!`
+* `upsert!`
+* Any calculations which are functionally pure
+* Debug output, like `println`, which doesn't affect the state of the business logic or effectors.
+
+Everything else goes in effectors. Business logic remains functionally pure, which will enable reasoning and testing.
+
+The [view effector](https://github.com/Provisdom/maali-simple/blob/master/src/provisdom/simple/view.cljs) for tic-tac-toe is responsible for changing the view in response to business logic state, as well as wiring up user input and providing any input as responses. An excerpt is shown below:
+
+```clj
+...
+
+(defn click-handler
+  [request]
+  (when request
+    (let [response (select-keys request [::simple/player ::simple/position])])
+      #(common/respond-to request response)))
+
+;;; Markup and styling from https://codepen.io/leesharma/pen/XbBGEj
+
+(defn tile
+  [session position]
+  (let [c (click-handler (rules/query-one :?request session ::simple/move-request :?position position :?player :o))
+        marker (rules/query-one :?player session ::simple/move :?position position)
+        win? (rules/query-one :?winning-square session ::simple/winning-square :?position position)]
+    [:td {:id (str position)
+          :class (cond-> "tile"
+                   win? (str " winningTile")
+                   c (str " clickable"))
+          :on-click c}
+     (condp = marker
+       :x "X"
+       :o "O"
+       "")]))
+
+...
+```
+
+The `click-handler` function is going to provide the response to a user click on an empty square. The `::MoveRequest` and `::MoveResponse` specs are defined as (from `provisdom.simple.rules)`:
+
+```clj
+...
+
+(s/def ::player #{:x :o})
+(s/def ::position (s/int-in 0 9))
+
+...
+
+(def-derive ::MoveRequest ::common/Request (s/keys :req [::position ::player]))
+(def-derive ::MoveResponse ::common/Response (s/keys :req [::position ::player]))
+
+...
+```
+`def-derive` is a macro defined in `provisdom.maali.rules` which defines a Clojure spec and establishes an "is a" relationship with some other spec (via Clojure's `derive` function). So a `::MoveRequest` is an instance of `::common/Request` with additional attributes `::player` and `::position`. That hierarchy proves handy sometimes, in particular allowing us to write a generic `::retract-orphan-response!` rule that applies to all entities deriving from `::common/Request` and `::common/Response`. 
+
+The `common/respond-to` function is a helper that allows effectors to be ignorant of the data flow wiring. All that is required is to call it with the request and response, assuming the request was created with the `common/request` function as we showed above. We don't show it here, but that will insert the response, fire the rules, and alert the effectors that the business logic state has changed.
+
+The `tile` function is responsible for the rendering and event-handling (when relevant). `tile` is called from another function which is rendering the board as an HTML table, and so returns the markup (as hiccup) for a `<td>` element. The `session` argument contains the business logic state, and `position` is the board position of the square being rendered. `provisdom.maali.rules/query-one` is a convenience method which executes a query against the business logic state and returns the first result (useful when you know there will only ever be a single result). The relevant queries for `tile` are (from `provisdom.maali-simple.rules`):
+
+```clj
+(defqueries queries
+  [::move-request [:?position :?player] [?request <- ::MoveRequest (= ?position position) (= ?player player)]]
+  [::move [:?position] [?move <- ::Move (= ?position position) (= ?player player)]]
+  [::winning-square [:?position] [?winning-square <- ::WinningSquare (= ?position position)]]
+  ...
+)
+```
+The query is parameterized by `?position` and `?player`, so we pass in the position argument supplied to `tile`, and `:o` for player, since the human player is always "O" in this game. If the session contains a `::MoveRequest` for the specified `position` (empty square) AND it is the human's turn to play, `rules/query-one` will return that `::MoveRequest`; otherwise it returns `nil`. We then have enough information to render the `<td>` with conditional CSS classes and event handling.
+
+The core AI effector code is
+
+```clj
+   (when (not-empty (rules/query-partial session ::simple/move-request :?player :x))
+     (let [moves (map :?move (rules/query-partial session ::simple/move))
+           board (simple/squares->board moves)
+           next-move (ai-fn board)
+           {::simple/keys [position player] :as move-request} 
+              (rules/query-one :?request session ::simple/move-request :?position next-move :?player :x)]
+       (common/respond-to move-request {::simple/position position ::simple/player player})))
+```
+
+The pattern is similar to the view. We check if there are `::MoveRequest`'s for the computer (`provisdom.maali.rules/query-partial` allows query execution specifying only a subset of query arguments). If so, we gather up all the existing moves, construct the board configuration, and pass that to the AI service to get the next move. We then find the `::MoveRequest` for thoe AI's chosen move, and respond appropriately.
+
+### Testing
+
+* Already specified some logical constraints
+* Integration testing
+
+[Video](https://www.loom.com/share/b4f27647e35b4447b71d6a2ba2b14612)
