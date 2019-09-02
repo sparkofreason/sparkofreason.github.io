@@ -352,7 +352,7 @@ The `tile` function is responsible for the rendering and event-handling (when re
   ...
 )
 ```
-The query is parameterized by `?position` and `?player`, so we pass in the position argument supplied to `tile`, and `:o` for player, since the human player is always "O" in this game. If the session contains a `::MoveRequest` for the specified `position` (empty square) AND it is the human's turn to play, `rules/query-one` will return that `::MoveRequest`; otherwise it returns `nil`. We then have enough information to render the `<td>` with conditional CSS classes and event handling.
+The `::move-request` query is parameterized by `?position` and `?player`, so we pass in the position argument supplied to `tile`, and `:o` for player, since the human player is always "O" in this game. If the session contains a `::MoveRequest` for the specified `position` (empty square) AND it is the human's turn to play, `rules/query-one` will return that `::MoveRequest`; otherwise it returns `nil`. `tile` similarly executes the queries for other relevant facts, providing information to render the `<td>` with conditional CSS classes and event handling.
 
 The core AI effector code is
 
@@ -370,7 +370,110 @@ The pattern is similar to the view. We check if there are `::MoveRequest`'s for 
 
 ### Testing
 
-* Already specified some logical constraints
-* Integration testing
+The purpose of testing software is to inform our beliefs about "correctness", that it performs according to our specifications. The discussion of how R-cubed enables testing probably warrants its own long discussion. We'll hit a couple of high points here.
 
-[Video](https://www.loom.com/share/b4f27647e35b4447b71d6a2ba2b14612)
+First, remember that while forward-chaining and truth maintenance simplifies R-cubed implementations, they aren't strictly required. But we accrue an additional benefit by declaring business logic as rules. Looking at the rule definitions, they very much resemble the sort of conditional statements employed in various testing scenarios. Suppose that we weren't using rules, and instead of having the `::move-request!` rule we had a `move-requests` function which took in the current state and returned the valid move requests. We then might write some unit tests for `move-requests`, supplying various test-cases, and then checking the output with conditional statements. Those conditions would appear very much the same as the rule definition. This is key: forward chaining with truth maintenance implies that the runtime guarantees the assertions to follow from the conditions, at least at the scope of a single rule. So we don't need to test that directly. Now, it may be that when combined with other rules, you induce some logical contradiction. Using rules doesn't get you out of testing, but it does provide some guarantees at a lower level, and allows more testing effort to be spent at a level more like "integration testing", where nastier bugs are likely to surface. Such bugs are often the result of logical contradictions between rules, which tend to be very obvious, for example, when firing the rules truth maintenance won't converge, but bounces back and forth between the offending rules.
+
+Rules aside, R-cubed facilitates direct testing of the business logic. Effects have been completely removed from the business logic. The requests for effects are simply as business logic state, and where applicable responses are just supplied as data. The implementation specifics of the effects are decomplected. The connection between business logic and effectors can (should?) be set at runtime, as determined by your data flow. Swapping out effector implementations for test mocks (or any alternative implementation) is therefore straightforward, without requiring we drag in dependency injection, mocking frameworks, and the like. The business logic itself is intrinsically synchronous and pure. Asynchronous handling is pushed to the effectors. For any state, we can ask for the set of pending requests, and assuming we have sufficient metadata describing the expected responses, can randomly and automatically provide response data. Some example test code for tic-tac-toe is shown below:
+
+```clj
+;;; TESTING
+
+(defn check-invariants
+  [session]
+  (let [moves (map :?move (rules/query-partial session ::simple/move))
+        move-requests (map :?request (rules/query-partial session ::simple/move-request))
+        game-over (rules/query-one :?game-over session ::simple/game-over)
+        winner (rules/query-one :?player session ::simple/winner)]
+    (let [counts (into {} (map (juxt key (comp count val)) (group-by ::simple/player moves)))
+          xs (or (:x counts) 0)
+          os (or (:o counts) 0)]
+      ; Make sure we don't have any extra moves. :x goes first so should be
+      ; either one ahead or equal to :o.
+      (when (or (< 1 (- xs os)) (> 0 (- xs os)))
+        (throw (ex-info "Invariant violation: extra moves" {:counts counts}))))
+    ; If all the squares are full, the game should be over.
+    (when (= 9 (count moves))
+      (when (not game-over)
+        (throw (ex-info "Invariant violation: game should be over" {}))))
+    ; Smart AI should never lose
+    (when smart-ai
+      (when (= :o winner)
+        (throw (ex-info "Invariant violation: smart AI should never lose" {}))))
+    ; In teaching mode, the user should never lose
+    (when teaching-mode
+      (when (= :x winner)
+        (throw (ex-info "Invariant violation: human should never lose in teaching-mode" {}))))
+    (let [mr-pos (set (map ::simple/position move-requests))
+          m-pos (set (map ::simple/position moves))]
+      ; Can't request a move for a square that's already been used.
+      (when (not-empty (set/intersection mr-pos m-pos))
+        (throw (ex-info "Invariant violation: moves and move requests should not have overlapping positions" {}))))))
+
+(defn abuse-simple
+  [session-atom iterations]
+  (add-watch session-atom :check-invariants
+             (fn [_ _ _ session]
+               (check-invariants session)))
+  (loop [i 0]
+    (if (< i iterations)
+      (do
+        (if (rules/query-one :?game-over @session-atom ::simple/game-over)
+          ; If the game is over, just reset
+          (let [req (rules/query-one :?request @session-atom ::simple/reset-request)]
+            (if req
+              (common/respond-to req)
+              (throw (ex-info "Should have reset request for game over" {}))))
+          ; if the game is not over, then play
+          (if (> 0.01 (rand))
+            ; Once in awhile, be a jerk and reset the game.
+            (when-let [req (rules/query-one :?request @session-atom ::simple/reset-request)]
+              (common/respond-to req))
+            (let [reqs (rules/query-partial @session-atom ::simple/move-request)]
+              (if (not-empty reqs)
+                ; If legal moves exist, choose one at random
+                (let [{::simple/keys [position player] :as req} (:?request (rand-nth reqs))]
+                  (common/respond-to req {::simple/position position ::simple/player player}))))))
+        (recur (inc i)))
+      (remove-watch session-atom :check-invariants))))
+```
+
+`check-invariants` are conditions we want to test. Most of these are for additional app-level features we didn't discuss here. For example, the final implementation of tic-tac-toe allows the user to switch between "dumb" and "smart" modes, which either randomly selects a move or does an exhaustive search of all possible future game moves and chooses the best one. Smart mode should never lose, if the AI is correctly implemented.
+
+`abuse-simple` runs the tests for the specified number of iterations. Each iteration checks the game state and then randomly chooses a request for which a response is provided. The `add-watch` statement at the top of `abuse-simple` subscribes to changes in the business logic state, and calls `check-invariants` for every change. We are simulation testing at the application level, rather than the function level. 
+
+We can further expand the scope of integration testing to include effectors, if/when it makes sense. A good example would be to connect the view effector, let it run, and watch for exceptions, indications of rendering errors, or whatever. [This video shows the results applied to tic-tac-toe](https://www.loom.com/share/b4f27647e35b4447b71d6a2ba2b14612). About the first half of the video has a longish delay between iterations, while the second half reduces this. We can take it even further, and interact with the UI while the simulation is running, as shown in [this video](https://www.loom.com/share/2acfcc211f4f49bb99f06dee4f3176c6).
+
+The tic-tac-toes application doesn't require any sort of generation of response data. The only input is click events (or equivalently the move choice from the AI service), and so the request data completely determines the response. The Maali implementation of TodoMVC does utilize generation of response data based both on response specs and request data:
+
+```clj 
+(def request->response
+  {::todo/EditRequest             ::common/Response
+   ::todo/UpdateDoneRequest       ::todo/UpdateDoneResponse
+   ::todo/RetractTodoRequest      ::common/Response
+   ::todo/CompleteAllRequest      ::common/Response
+   ::todo/RetractCompletedRequest ::common/Response
+   ::todo/VisibilityRequest       ::todo/VisibilityResponse})
+
+... 
+
+(defn gen-response
+  [request]
+  (let [response (sg/generate (s/gen (request->response (rules/spec-type request))))]
+    (assoc response ::common/Request request)))
+
+(defn gen-visibility-response
+  [visibility-request]
+  (let [response (gen-response visibility-request)]
+    (assoc response ::todo/visibility (sg/generate (s/gen (::todo/visibilities visibility-request))))))
+```
+
+`gen-response` will generate response data based on the spec for the `::Response` entity expected for a given `::Request` spec. `gen-visibility-response` picks a visibility filter based on the valid options in the `::VisibilityRequest`. Those options change with the business logic state, so must be generated dynamically, rather than from a static spec. [Here is another video, showing the simulation test for TodoMVC connected to the view effector](https://www.loom.com/share/8f4f44477fb14d138971695f6861b6be).
+
+# Links
+
+* [Reification of Request and Response (R^3)](https://sparkofreason.gitbooks.io/maali/content/) - A GitBook with some more in-depth discussion of the ideas, as well as a detailed description of the tic-tac-toe application and some extensions.
+* [https://github.com/Provisdom/maali](https://github.com/Provisdom/maali) - Maali code.
+* [http://www.clara-rules.org/](http://www.clara-rules.org/) - clara-rules site.
+* [https://github.com/Provisdom/maali-simple](https://github.com/Provisdom/maali-simple) - tic-tac-toe code based on Maali.
+* [https://github.com/Provisdom/maali-todomvc](https://github.com/Provisdom/maali-todomvc) - TodoMVC implementation based on Maali.
