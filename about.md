@@ -36,3 +36,24 @@ Founder and Chief Software Architect at [Compute Software](https://www.computeso
 ### Contact me
 
 [dave.d.dixon@gmail.com](mailto:dave.d.dixon@gmail.com)
+
+### Some orginal music selections
+
+Some of this was transferred from 20+ year-old cassette tape, so forgive the audio quality.
+
+#### Lighter
+* [Polyrhythmia](https://www.youtube.com/watch?v=Ec127q4Yw7g)
+* [Flight of Sunshine](https://www.youtube.com/watch?v=hP_bj9UaP0U)
+* [Old School New Age](https://www.youtube.com/watch?v=6R5jJgnU2UE)
+* [On It Turns](https://www.youtube.com/watch?v=G2CwooE1k4w)
+* [Jazz Odyssey](https://www.youtube.com/watch?v=sLWGsLlsF7Y)
+* [Evangelis](https://www.youtube.com/watch?v=Ny9JHM_E-Bw)
+
+#### Heavier
+* [Needle in my Eye](https://www.youtube.com/watch?v=VJPpemdDd10)
+* [Monkey Eat Dead Monkey Head](https://www.youtube.com/watch?v=f-NNkcqNp4s)
+
+#### Selections from the album Satanic Gizmo (not for the easily offended)
+* [Liar](https://www.youtube.com/watch?v=S7fNwkdGS9I)
+* [Area 51](https://www.youtube.com/watch?v=kpiMmvl4c2A)
+* [Satanic Gizmo](https://www.youtube.com/watch?v=VEA-WzHZs5w)
