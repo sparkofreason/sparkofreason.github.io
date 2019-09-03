@@ -23,7 +23,7 @@ Fast forward to today. Batch programs still exist, but much of the effort in sof
 * third-party services,
 * and so on.
 
-For such applications, we no longer have the nice clean situation of a single batch of input, transformed by sequential statements to produce a unique batch of output. There are multiple points of input (client, message queues, responses to requests from DBs or other services), these change over time with the state of the system, with no guarantees of ordering. We can try to force such guarantees, but in real distributed system this almost always leads to undesirable effects such as poor performance.
+For such applications, we no longer have the nice clean situation of a single batch of input, transformed by sequential statements to produce a unique batch of output. There are multiple points of input (client, message queues, responses to requests to DBs or other services), these change over time with the state of the system, with no guarantees of ordering. We can try to force such guarantees, but in real distributed system this almost always leads to undesirable effects such as poor performance.
 
 In the beginning, we could rely on the local and sequential nature of code execution. Many _logical_ constraints of the system were enforced simply as _temporal_ constraints: we can assume _X_ is true at line 50 because we asserted _X_ at line 49. Pseudocode example:
 
@@ -75,6 +75,7 @@ Let's call all such "dynamic inputs" _requests_.  A request is the abstraction i
 
 * A request might not receive a response.
 * A response is always associated with a specific request instance.
+* A request receives at most a single (logical) response.
 * The order of responses to requests is not guaranteed.
 * A request might become invalid while a response is "in flight" (more on this below).
 
@@ -82,7 +83,7 @@ Let's call all such "dynamic inputs" _requests_.  A request is the abstraction i
 
 Requests are part of the system state. That state is generally implementation specific, as is what you can interrogate or modify, which can make testing a headache. For HTTP service requests, we might need to inject some sort of mock implementation of the service, which not only responded to requests with the appropriate data, but also verified that requests were made as required. Maybe we'd use Selenium or some other browser mock to drive testing of requests to the user interface, something else to mock message queues, and so forth.
 
-The state describing requests may also depend on program state. A request could be issued based on some condition. Some other request then receives a response that changes state rendering the first request invalid. But we have no control over the response arriving. Once a request is invalid, we need to ensure that the response is ignored, for example, don't execute the code in the callback. Otherwise we open the possibility of nasty race condition bugs, and must test such scenarios directly.
+The state describing requests may also depend on business logic. A request could be issued based on some condition. Some other request then receives a response that changes state rendering the first request invalid. But we have no control over the response arriving. Once a request is invalid, we need to ensure that the response is ignored, for example, don't execute the code in the callback. Otherwise we open the possibility of nasty race condition bugs, and must test such scenarios directly.
 
 ## Coupling
 
@@ -91,9 +92,9 @@ Requests represent interfaces with the outside world, systems that are potential
 1. Logical coupling, like the specifics of what is sent in an HTTP request or database query;
 2. Implementation coupling, such as how your language runtime and the OS wire up sending an HTTP request and dealing with the response, if/when it comes.
 
-Abstractions which allow requests to appear as "normal" sequential code cause such coupling to occur deep in the guts of your code. I feel this is a questionable practice. Say you were building an electronic device, which allowed a user to input numbers, and had other interfaces which maybe sent signals to other devices, etc. You wouldn't build this thing where the keypad and other interface points were buried deep inside the device, requiring to to be disassmbled to be accessed. The same thing applies in code. Burying requests in your implementation makes it more difficult to both reason about and test. These points where we interface with users or other systems are generally critically important, and should be exposed at the boundaries of our system. 
+Abstractions which allow requests to appear as "normal" sequential code cause such coupling to occur deep in the guts of your code. I feel this is a questionable practice. Say you were building an electronic device, which allowed a user to input numbers, and had other interfaces which maybe sent signals to other devices, etc. You wouldn't build this thing where the keypad and other interface points were buried deep inside the device, requiring disassmbly to be accessed. The same thing applies in code. Burying requests in your implementation makes it more difficult to both reason about and test. These points where we interface with users or other systems are generally critically important, and should be exposed at the boundaries of our system. 
 
-And unlike the electronic box analogy, the interfaces are potentially changing over time. Ideally we should be able to query the system and see exactly what requests are pending. And those requests should be abstracted as just data describing the request, explicitly part of the system state. That allows us to focus on business logic, without getting tangled up in the implementation details of interfacing with users or other external services and systems. The code which handles the actual implementation details of wiring up those requests can be separated from the business logic, and thus replaced ad hoc for testing. 
+And unlike the electronic box analogy, the interfaces are potentially changing over time. We should be able to query the system and see exactly what requests are pending. And those requests should be abstracted as just data describing the request, explicitly part of the system state. That allows us to focus on business logic, without getting tangled up in the implementation details of interfacing with users or other external services and systems. The code which handles the actual implementation details of wiring up those requests can be separated from the business logic, and thus replaced ad hoc for testing. 
 
 # R-cubed: Reification of Request/Response
 
@@ -107,9 +108,11 @@ A "component" in an R-cubed system could be anything with persistent state, dedi
 
 Each R-cubed component requires three pieces:
 
-1. Business Logic - Implementation of the logical requirements of your application. For tic-tac-toe, these include determining if the game is over (some player won or tie game), which player moves next, or resetting the game state to start a new match. The business logic also maintains the state, and transformation of that state when a request receives a response. The state in the tic-tac-toe example would include the current game board (which squares are empty, or have an `X` or `O`), and the current set of valid requests. Requests will either be a `MoveRequest` for the current player and each empty square, and a `ResetRequest` when it is the human player's turn.
+1. Business Logic - Implementation of the logical requirements of your application. For tic-tac-toe, these include determining if the game is over (some player won or tie game), which player moves next, or resetting the game state to start a new match. The business logic also maintains the state, and transformation of that state when a request receives a response. The state in the tic-tac-toe example would include the current game board (which squares are empty, or have an `X` or `O`), and the current set of valid requests. Requests will be 
+    * `MoveRequest` for the current player and each empty square;
+    * `ResetRequest` when it is the human player's turn.
 2. Effectors - Effectors implement effects based on the current business logic state. Effectors must therefore be able to query that state. The effectors for tic-tac-toe will be
-    * UI - renders the current UI based on the business logic state, and wires up events for user inputs corresponding to valid requests.
+    * View - renders the current UI based on the business logic state, and wires up events for user inputs corresponding to valid requests.
     * AI - calls the AI service to get the next move when it's the computer's turn, handles the response.
 3. Data flow - some implementation which allows effectors to 
     * Get updated query results when business logic state is changed
@@ -141,7 +144,7 @@ Before diving into the specifics of the tic-tac-toe implementation, we examine s
 
 What happens at step (5)? The correct action would be to ignore the response, which means we removed or otherwise invalidated the associated `MoveRequest` from the business logic state. We could just be careful to write code to do that explicitly: when Reset is pushed, delete all of the `MoveRequest`'s. What if additional functionality were added to future versions that could invalidate requests to the AI? We'd have to be disciplined enough to delete the `MoveRequest`'s there as well.
 
-Words like "careful" and "disciplined", when applied to programming, imply a high likelihood of creating incorrect code. Why do tools like static type checkers or runtime data validators exist? So you don't have to be careful. You could write code with no type validation whatsoever, try to remember the type of every variable, shape of every compound data structure, signature of every function, and so forth. But why? That's the kind of shit computers are really good at: ensuring constraints are not violated, everywhere and always. Such tools allow us to dedicate more mental energy to the stuff that rings the cash register, implementing the business requirements.
+Words like "careful" and "disciplined", when applied to programming, imply a high likelihood of creating incorrect code. Why do tools like static type checkers or runtime data validators exist? So you don't have to be careful. You could write code with no type validation whatsoever, try to remember the type of every variable, shape of every compound data structure, signature of every function, and so forth. But why? That's the kind of shit computers are really good at: ensuring constraints are not violated, everywhere and always. Such tools allow us to dedicate more mental energy to the stuff that rings the cash register: implementing the business requirements.
 
 The constraints we're interested in here are not about data per se, but logical statements of the form `if X then assert Y`, where `X` and `Y` are logical assertions based on the business logic state. An example could be `if x == 5 then assert y == -1`. When the value of `x` becomes `5`, we want the state to contain the fact that `y` has the value `-1`, which may imply a state change. If `x` subsequently became `4`, we want to retract the previously asserted fact `y == -1`. Returning to our tic-tac-toe example: `if player == computer AND square_5 == empty then assert MoveRequest(player == computer, square == square_5)`. If the condition becomes false by hitting Reset (or any other cause), the `MoveRequest` will be retracted, thus avoiding the race condition with the AI service response.
 
@@ -231,7 +234,7 @@ The `upsert!` on `::CurrentPlayer` is similar. `::CurrentPlayer` starts as an in
 (rules/insert-unconditional! ::CurrentPlayer (assoc ?current-player ::player (next-player ?player)))
 ```
 
-We don't bother suffixing `rules/upsert!` with `-unconditional`, because logically all upserts *must* be unconditional. Here's what happens `insert-unconditional!` above were replaced with `insert!`:
+We don't bother suffixing `rules/upsert!` with `-unconditional`. Logically all upserts *must* be unconditional. Here's what happens `insert-unconditional!` above were replaced with `insert!`:
 
 * The current value of the `::CurrentPlayer` fact is bound to `?current-player`.
 * `?current-player` is retracted.
@@ -240,7 +243,7 @@ We don't bother suffixing `rules/upsert!` with `-unconditional`, because logical
 
 So `upsert!` is always unconditional. To be otherwise would lead to logical contradictions in your rules, essentially stating "`X` implies `not X`".
 
-We noted above that requests are conditional, and subject to truth maintenance. The `::MoveRequest`'s created by the `::move-request!` will be automatically retracted whenever the `if`-bindings modified:
+We noted above that requests are conditional, and subject to truth maintenance. The `::MoveRequest`'s created by the `::move-request!` will be automatically retracted whenever the `if`-bindings are modified:
 
 * The value of the `::CurrentPlayer` changes
 * OR The current set of `::Move`'s changes
@@ -284,13 +287,13 @@ This covers two scenarios:
 
 ### Effectors
 
-A key part of R-cubed is the separation of the code performing effects from the logic requesting those effects. This likely requires some "disclipline". Most programming languages don't provide a way to guarantee that business logic code contains no effects. Maali (and the underlying clara-rules) allows you to write arbitrary Clojure code in the `then` part of the rule, so you could do all kinds of stuff there, like mutating the UI, putting stuff in a database, etc. Don't do that. Restrict the `then` clauses to the following (for Maali, or equivalent operations in your language)
+R-cubed separates the code performing effects from the logic requesting those effects. Some "disclipline" may be required. Most programming languages don't provide a way to guarantee that business logic code contains no effects. Maali (and the underlying clara-rules) allows you to write arbitrary Clojure code in the `then` part of the rule, so you could do all kinds of stuff there, like mutating the UI, putting stuff in a database, etc. Don't do that. Restrict the `then` clauses to the following (for Maali, or equivalent operations in your language)
 
 * `insert!`
 * `insert-unconditional!`
 * `retract!`
 * `upsert!`
-* Any calculations which are functionally pure
+* Any computations which are functionally pure
 * Debug output, like `println`, which doesn't affect the state of the business logic or effectors.
 
 Everything else goes in effectors. Business logic remains functionally pure, which will enable reasoning and testing.
@@ -326,7 +329,7 @@ The [view effector](https://github.com/Provisdom/maali-simple/blob/master/src/pr
 ...
 ```
 
-The `click-handler` function is going to provide the response to a user click on an empty square. The `::MoveRequest` and `::MoveResponse` specs are defined as (from `provisdom.simple.rules)`:
+The `click-handler` function is going to provide the response to a user click on an empty square. The `::MoveRequest` and `::MoveResponse` specs are defined in `provisdom.simple.rules`:
 
 ```clj
 ...
@@ -345,7 +348,7 @@ The `click-handler` function is going to provide the response to a user click on
 
 The `common/respond-to` function is a helper that allows effectors to be ignorant of the data flow wiring. All that is required is to call it with the request and response, assuming the request was created with the `common/request` function as we showed above. We don't show it here, but this will insert the response, fire the rules, and alert the effectors that the business logic state has changed.
 
-The `tile` function is responsible for the rendering and event-handling (when relevant). `tile` is called from another function which is rendering the board as an HTML table, and so returns the markup (as [hiccup](https://github.com/weavejester/hiccup/wiki/Syntax)) for a `<td>` element. The `session` argument contains the business logic state, and `position` is the board position of the square being rendered. `provisdom.maali.rules/query-one` is a convenience method which executes a query against the business logic state and returns the first result (useful when you know there will only ever be a single result). The relevant queries for `tile` are (from `provisdom.maali-simple.rules`):
+The `tile` function is responsible for the rendering and event-handling (when relevant). `tile` is called from another function which is rendering the board as an HTML table, and so returns the markup (as [hiccup](https://github.com/weavejester/hiccup/wiki/Syntax)) for a `<td>` element. The `session` argument contains the business logic state, and `position` is the board position of the square being rendered. `provisdom.maali.rules/query-one` is a convenience method which executes a query against the business logic state and returns the first result (useful when you know there will only ever be a single result). The relevant queries for `tile` are (from `provisdom.simple.rules`):
 
 ```clj
 (defqueries queries
