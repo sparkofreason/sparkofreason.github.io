@@ -47,7 +47,7 @@ Some of this was transferred from 20+ year-old cassette tape, so forgive the aud
 * [Old School New Age](https://www.youtube.com/watch?v=6R5jJgnU2UE)
 * [On It Turns](https://www.youtube.com/watch?v=G2CwooE1k4w)
 * [Jazz Odyssey](https://www.youtube.com/watch?v=sLWGsLlsF7Y)
-* [Fire Side](https://www.youtube.com/watch?v=G8TV7A6YiqM)
+* [Fire Eyes](https://www.youtube.com/watch?v=G8TV7A6YiqM)
 * [Evangelis](https://www.youtube.com/watch?v=Ny9JHM_E-Bw)
 
 #### Heavier
