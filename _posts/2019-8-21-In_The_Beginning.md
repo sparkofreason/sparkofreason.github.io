@@ -5,34 +5,11 @@ excerpt_separator: <!--more-->
 published: true
 ---
 
-# tl;dr
-
-## Problem
-
-Programming languages often imply logical constraints via the order in which code is written. Modern systems, however, often consist of multiple components communicating asynchronously with each other and external entities (users, 3rd-party services, databases). We wish to maximize the chances that the logical constraints from our business logic requirements are maintained, regardless of the order in which messages are exchanged amongst the various parts of the system.
-
-## Solution
-
-Program state is dynamic, so conditions in which various communication scenarios are valid can change as as a component receives messages. Commonly this is reflected as effects connected to the specific implementation of the messaging:
-
-* Issuance of an HTTP request
-* Subscription to an event handler for a UI element
-* And so forth
-
-The suggestion here is instead to abstract and reify this state along with the rest of our business logic state. Call the data indicating a message can be received a "request", and the message itself a "response". The effects associated with receiving a message and handled separately, as requests appear in the business logic state. The use of forward-chaining, though not required, facilitates this pattern by automating some boilerplate processing.
-
-<!--more-->
-
-## Benefits
-
-* What were once effects generated deep in our code now becomes "just data", part of the program state. Points of interaction with other systems can thus be pushed to the edges of our implementation, rather than being coupled in the guts of business logic.
-* Requests and responses, being data with defined specifications, can be queried and generated, allowing for detailed testing without added complexity like dependency injection.
-* Common and hard-to-find bugs like race conditions are mitigated.
-* Automated simulation testing is enabled.
-
 # Order
 
 In the beginning, there were programs. Programs generally consisted of statements which ran in order. The order was originally an actual physical ordering: instructions on a sequential tape, or a sequence of punch cards. "Order" later became order of lines or "statements" in a text file. Some code may be conditionally executed, and we could jump around with `GOTO`'s, loops, subroutines, functions, etc. But programs basically consisted of chunks of statements executed in order.
+
+<!--more-->
 
 In the beginning, all code executed in a local environment. The hardware hid nasty details from us, such as the delay between issuing a memory-write command on the CPU and that value being available for read. Our statements executed on single thread, and we didn't worry much about "effects" and potential synchronization issues, because everything was made to appear synchronous.
 
