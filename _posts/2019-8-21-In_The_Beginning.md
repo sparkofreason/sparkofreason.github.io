@@ -25,8 +25,8 @@ The suggestion here is instead to abstract and reify this state along with the r
 
 ## Benefits
 
-* What were once effects generated deep in our code now becomes "just data", part of the program state. Points of interaction with other systems can thus be pushed to the edges of our implementation, rather than being coupled deep inside of our code.
-* Requests and responses, being data with defined specifications, can be queries and generated, allowing for detailed testing without added complexity like dependency injection.
+* What were once effects generated deep in our code now becomes "just data", part of the program state. Points of interaction with other systems can thus be pushed to the edges of our implementation, rather than being coupled in the guts of business logic.
+* Requests and responses, being data with defined specifications, can be queried and generated, allowing for detailed testing without added complexity like dependency injection.
 * Common and hard-to-find bugs like race conditions are mitigated.
 * Automated simulation testing is enabled.
 
