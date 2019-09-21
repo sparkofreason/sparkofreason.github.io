@@ -1,18 +1,42 @@
 ---
 layout: post
-title: In the Beginning, There Were Programs
+title: 'In the Beginning, There Were Programs'
 excerpt_separator: <!--more-->
+published: true
 ---
+
+#tl;dr
+
+## Problem
+
+Programming languages often imply logical constraints via the order in which code is written. Modern systems, however, often consist of multiple components communicating asynchronously with each other and external entities (users, 3rd-party services, databases). We wish to maximize the chances that the logical constraints from our business logic requirements are maintained, regardless of the order in which messages are exchanged amongst the various parts of the system.
+
+## Solution
+
+Program state is dynamic, so conditions in which various communication scenarios are valid can change as as a component receives messages. Commonly this is reflected as effects connected to the specific implementation of the messaging:
+
+* Issuance of an HTTP request
+* Subscription to an event handler for a UI element
+* And so forth
+
+The suggestion here is instead to abstract and reify this state along with the rest of our business logic state. Call the data indicating a message can be received a "request", and the message itself a "response". The effects associated with receiving a message and handled separately, as requests appear in the business logic state. The use of forward-chaining, though not required, facilitates this pattern by automating some boilerplate processing.
+
+## Benefits
+
+* What were once effects generated deep in our code now becomes "just data", part of the program state. Points of interaction with other systems can thus be pushed to the edges of our implementation, rather than being coupled deep inside of our code.
+* Requests and responses, being data with defined specifications, can be queries and generated, allowing for detailed testing without added complexity like dependency injection.
+* Common and hard-to-find bugs like race conditions are mitigated.
+* Automated simulation testing is enabled.
 
 # Order
 
-In the beginning, there were programs. Programs generally consisted of statements which ran in order. The order was originally an actual physical ordering: instructions on a sequential tape, or a sequence of punch cards. Order later became order of lines or "statements" in a text file. Some code may be conditionally executed, and we could jump around with `GOTO`'s, loops, subroutines, functions, etc. But programs basically consisted of chunks of statements executed in order.
+In the beginning, there were programs. Programs generally consisted of statements which ran in order. The order was originally an actual physical ordering: instructions on a sequential tape, or a sequence of punch cards. "Order" later became order of lines or "statements" in a text file. Some code may be conditionally executed, and we could jump around with `GOTO`'s, loops, subroutines, functions, etc. But programs basically consisted of chunks of statements executed in order.
 
 <!--more-->
 
 In the beginning, all code executed in a local environment. The hardware hid nasty details from us, such as the delay between issuing a memory-write command on the CPU and that value being available for read. Our statements executed on single thread, and we didn't worry much about "effects" and potential synchronization issues, because everything was made to appear synchronous.
 
-In the beginning, input was static. We had a batch of data that went in to our program, and later we'd get some batch of output. The program was ephermeral, lasting only long enough to either process the input or perhaps fail. Programming languages perhaps were not "functional" as defined today, but the program itself (often) exhibited mathematical purity.
+In the beginning, input was static. We had a batch of data that went in to our program, and later we'd get some batch of output. The program was ephemeral, lasting only long enough to either process the input or perhaps fail. Programming languages perhaps were not "functional" as defined today, but the program itself (often) exhibited mathematical purity.
 
 # Chaos
 
@@ -92,7 +116,7 @@ Requests represent interfaces with the outside world, systems that are potential
 1. Logical coupling, like the specifics of what is sent in an HTTP request or database query;
 2. Implementation coupling, such as how your language runtime and the OS wire up sending an HTTP request and dealing with the response, if/when it comes.
 
-Abstractions which allow requests to appear as "normal" sequential code cause such coupling to occur deep in the guts of your code. I feel this is a questionable practice. Say you were building an electronic device, which allowed a user to input numbers, and had other interfaces which maybe sent signals to other devices, etc. You wouldn't build this thing where the keypad and other interface points were buried deep inside the device, requiring disassmbly to be accessed. The same thing applies in code. Burying requests in your implementation makes it more difficult to both reason about and test. These points where we interface with users or other systems are generally critically important, and should be exposed at the boundaries of our system. 
+Abstractions which allow requests to appear as "normal" sequential code cause such coupling to occur deep in the guts of your code. I feel this is a questionable practice. Say you were building an electronic device, which allowed a user to input numbers, and had other interfaces which maybe sent signals to other devices, etc. You wouldn't build this thing where the keypad and other interface points were buried inside the device, requiring disassmbly to be accessed. The same thing applies in code. Burying requests in your implementation increases the pain for reasoning about and testing your code. These points where we interface with users or other systems are generally critically important, and should be exposed at the boundaries of our system. 
 
 And unlike the electronic box analogy, the interfaces are potentially changing over time. We should be able to query the system and see exactly what requests are pending. And those requests should be abstracted as just data describing the request, explicitly part of the system state. That allows us to focus on business logic, without getting tangled up in the implementation details of interfacing with users or other external services and systems. The code which handles the actual implementation details of wiring up those requests can be separated from the business logic, and thus replaced ad hoc for testing. 
 
@@ -144,9 +168,9 @@ Before diving into the specifics of the tic-tac-toe implementation, we examine s
 
 What happens at step (5)? The correct action would be to ignore the response, which means we removed or otherwise invalidated the associated `MoveRequest` from the business logic state. We could just be careful to write code to do that explicitly: when Reset is pushed, delete all of the `MoveRequest`'s. What if additional functionality were added to future versions that could invalidate requests to the AI? We'd have to be disciplined enough to delete the `MoveRequest`'s there as well.
 
-Words like "careful" and "disciplined", when applied to programming, imply a high likelihood of creating incorrect code. Why do tools like static type checkers or runtime data validators exist? So you don't have to be careful. You could write code with no type validation whatsoever, try to remember the type of every variable, shape of every compound data structure, signature of every function, and so forth. But why? That's the kind of shit computers are really good at: ensuring constraints are not violated, everywhere and always. Such tools allow us to dedicate more mental energy to the stuff that rings the cash register: implementing the business requirements.
+Words like "careful" and "disciplined", when applied to programming, imply a high likelihood of creating incorrect code. Why do tools like static type checkers or runtime data validators exist? So you don't have to be careful. You could write code with no type validation whatsoever, try to remember the type of every variable, shape of every compound data structure, signature of every function, and so forth. But why? That's the boring shit computers are really good at: ensuring constraints are not violated, everywhere and always. Such tools allow us to dedicate more mental energy to the stuff that rings the cash register: implementing the business requirements.
 
-The constraints we're interested in here are not about data per se, but logical statements of the form `if X then assert Y`, where `X` and `Y` are logical assertions based on the business logic state. An example could be `if x == 5 then assert y == -1`. When the value of `x` becomes `5`, we want the state to contain the fact that `y` has the value `-1`, which may imply a state change. If `x` subsequently became `4`, we want to retract the previously asserted fact `y == -1`. Returning to our tic-tac-toe example: `if player == computer AND square_5 == empty then assert MoveRequest(player == computer, square == square_5)`. If the condition becomes false by hitting Reset (or any other cause), the `MoveRequest` will be retracted, thus avoiding the race condition with the AI service response.
+The constraints here are not about data type or shape, but logical statements of the form `if X then assert Y`, where `X` and `Y` are logical assertions based on the business logic state. An example could be `if x == 5 then assert y == -1`. When the value of `x` becomes `5`, we want the state to contain the fact that `y` has the value `-1`, which may imply a state change. If `x` subsequently became `4`, we want to retract the previously asserted fact `y == -1`. Returning to our tic-tac-toe example: `if player == computer AND square_5 == empty then assert MoveRequest(player == computer, square == square_5)`. If the condition becomes false by hitting Reset (or any other cause), the `MoveRequest` will be retracted, thus avoiding the race condition with the AI service response.
 
 The general classification of such functionality is called [logic programming](https://en.wikipedia.org/wiki/Logic_programming). The specific type of logic programming we will employ is [foward chaining rules](https://en.wikipedia.org/wiki/Logic_programming) with [truth maintenance](https://en.wikipedia.org/wiki/Reason_maintenance).
 
@@ -243,7 +267,7 @@ We don't bother suffixing `rules/upsert!` with `-unconditional`. Logically all u
 
 So `upsert!` is always unconditional. To be otherwise would lead to logical contradictions in your rules, essentially stating "`X` implies `not X`".
 
-We noted above that requests are conditional, and subject to truth maintenance. The `::MoveRequest`'s created by the `::move-request!` will be automatically retracted whenever the `if`-bindings are modified:
+Requests are conditional, and subject to truth maintenance. The `::MoveRequest`'s created by the `::move-request!` will be automatically retracted whenever the `if`-bindings are modified:
 
 * The value of the `::CurrentPlayer` changes
 * OR The current set of `::Move`'s changes
