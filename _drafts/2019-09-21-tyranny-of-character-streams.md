@@ -1,5 +1,7 @@
 ---
 published: false
+layout: post
+excerpt_separator: <!--more-->
 ---
 ## On the Tyranny of Character Streams
 
