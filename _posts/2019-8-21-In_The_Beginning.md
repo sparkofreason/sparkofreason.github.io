@@ -33,7 +33,7 @@ var x = 1
 x == x + 1
 ```
 
-The assignment `x == x + 1` does not have to be surrounded by and `if` statement checking that `x` is defined. We did it in the preceeding line, and assume it to be true. And that's a good thing. Having the compiler guarantee such logical constraints as a consequence of ordering relieves us of a lot of typing and mental overhead. We like it so much, we often try to write code the same way even when such guarantees can't be made.
+The assignment `x == x + 1` does not have to be surrounded by and `if` statement checking that `x` is defined. We did it in the preceding line, and assume it to be true. And that's a good thing. Having the compiler guarantee such logical constraints as a consequence of ordering relieves us of a lot of typing and mental overhead. We like it so much, we often try to write code the same way even when such guarantees can't be made.
 
 ```
 async function foo(x) {
@@ -72,7 +72,7 @@ Is it still valid to send the result of the `textBox.onchange` event if `Rec.X` 
 
 The examples above all exhibit _dynamic inputs_, inputs that change with the execution or state of the system. A HTTP request often implies that we expect a response (assuming it isn't "fire and forget"). We provide a callback function which is executed *if* a response is received, and perhaps different code to handle errors. By making the request, we've created a new input to our system, a place where the "outside world" will provide some response. Other examples include event callbacks for UI elements, handlers for message queues, and so forth. Abstractly, these are all the same. 
 
-Let's call all such "dynamic inputs" _requests_.  A request is the abstraction indicating our program can receive some input from the outside world, regardless of the implementation details. A _response_ is that input data. Assume the minimum about requests and responsees:
+Let's call all such "dynamic inputs" _requests_.  A request is the abstraction indicating our program can receive some input from the outside world, regardless of the implementation details. A _response_ is that input data. Assume the minimum about requests and responses:
 
 * A request might not receive a response.
 * A response is always associated with a specific request instance.
@@ -155,10 +155,10 @@ The general classification of such functionality is called [logic programming](h
 
 [Maali](https://github.com/Provisdom/maali) is a Clojure library, built on the excellent [clara-rules](http://www.clara-rules.org/) library. clara-rules is an implementation of forward-chaining rules with truth maintenance. Maali adds some functionality which I found useful for R-cubed:
 
-1. clara-rules defaults to using Clojure `defrecord`'s (essentially typed Java objects) to represent fact data. Maali uses Clojure maps, with [Clojure spec](https://clojure.org/guides/spec) used to define fact "types" and perform runtime validation. spec provides more flexible validation than the simple struct-like type constraints of a `defrecord`, and we use it throughout our code for other purposes. Spec doesn't play well with `defrecord` either.
-2. clara-rules defines rules as Clojure `var`'s via the `defrule` macro, and groups them under Clojure namespaces. Maali allows collections of rules to be defined under a single `var` with a `defrules` macro. Correspondingly, session creation in clara-rules specifies the namespaces containing the rules included in the session, while in Maali you just provide the rule collection vars. The same applies to queries, e.g. `defquery` -> `defqueries`. (Aside: I think this choice was mostly a matter of personal preference, though it may have facilitated dynamic reloading of rules in ClojureScript, a la figwheel.)
-3. Maali provides some specific tooling around R-cubed for wiring up data flow, creating requests, handling responses, and dealing with cancellation.
-4. Maali provides a base set of rules for maintaining logical consistency of requests/responses.
+1. clara-rules defines rules as Clojure `var`'s via the `defrule` macro, and groups them under Clojure namespaces. Maali allows collections of rules to be defined under a single `var` with a `defrules` macro. Correspondingly, session creation in clara-rules specifies the namespaces containing the rules included in the session, while in Maali you just provide the rule collection vars. The same applies to queries, e.g. `defquery` -> `defqueries`. (Aside: I think this choice was mostly a matter of personal preference, though it may have facilitated dynamic reloading of rules in ClojureScript, a la figwheel.)
+2. Maali provides some specific tooling around R-cubed for wiring up data flow, creating requests, handling responses, and dealing with cancellation.
+3. Maali provides a base set of rules for maintaining logical consistency of requests/responses.
+4. Maali was written with spec'ed Clojure maps as the representation of fact entities. It is possible that it could be adapted to use `defrecord`, which may be somewhat faster.  
 
 The Clojure DSL used to define rules and queries in Maali is largely the same as that in the underlying clara-rules, so most of the [clara-rules documentation](http://www.clara-rules.org/docs/firststeps/) applies. Differences will be highlighted in the code examples below.
 
@@ -206,9 +206,9 @@ The `::reset-board-request!` rule is read as
 
 * *IF*
     * No fact of type `::GameOver` exists;
-    * AND Bind the value of the `::player` attribute of the `::CurrentPlayer` entity to the `?player` variable;
-    * AND Bind all of the existing `::Move` entities to the `?moves` variable;
-    * AND Bind the `?response-fn` variable to the value of the `:response-fn` attribute on the `::common/ResponseFunction` entity.
+    * AND we can bind the value of the `::player` attribute of the `::CurrentPlayer` entity to the `?player` variable;
+    * AND Bind all of the existing `::Move` entities to the `?moves` variable (aside: this is always possible in clara, if no `::Move` entities exist then `?moves` will b an empty collection);
+    * AND we can bind the `?response-fn` variable to the value of the `:response-fn` attribute on the `::common/ResponseFunction` entity.
 * *THEN*
     * Conditionally insert a new `::MoveRequest`'s (constructed using the `common/request` function) for all squares not containing a move.
 
@@ -359,7 +359,7 @@ The `tile` function is responsible for the rendering and event-handling (when re
   ...
 )
 ```
-The `::move-request` query is parameterized by `?position` and `?player`, so we pass in the position argument supplied to `tile`, and `:o` for player, since the human player is always "O" in this game. If the session contains a `::MoveRequest` for the specified `position` (empty square) AND it is the human's turn to play, `rules/query-one` will return that `::MoveRequest`; otherwise it returns `nil`. `tile` similarly executes the queries for other relevant facts, providing information to render the `<td>` with conditional CSS classes and event handling.
+The `::move-request` query is parameterized by `?position` and `?player`, so we pass in the position argument supplied to `tile`, and `:o` for player, since the human player is always "O" in this game. If the session contains a `::MoveRequest` for the specified `position` (empty square) AND it is the human's turn to play, `rules/query-one` will return that `::MoveRequest`; otherwise it returns `nil`. That value is in turn passed to `click-handler`, which returns a function to handle a clicke event if there is a valid request (i.e. the square can be selected by the human player); otherwise it returns `nil`. `tile` similarly executes the queries for other relevant facts, providing information to render the `<td>` with conditional CSS classes and event handling.
 
 The core AI effector code is
 
