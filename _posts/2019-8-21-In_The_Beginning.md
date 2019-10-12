@@ -359,7 +359,7 @@ The `tile` function is responsible for the rendering and event-handling (when re
   ...
 )
 ```
-The `::move-request` query is parameterized by `?position` and `?player`, so we pass in the position argument supplied to `tile`, and `:o` for player, since the human player is always "O" in this game. If the session contains a `::MoveRequest` for the specified `position` (empty square) AND it is the human's turn to play, `rules/query-one` will return that `::MoveRequest`; otherwise it returns `nil`. That value is in turn passed to `click-handler`, which returns a function to handle a clicke event if there is a valid request (i.e. the square can be selected by the human player); otherwise it returns `nil`. `tile` similarly executes the queries for other relevant facts, providing information to render the `<td>` with conditional CSS classes and event handling.
+The `::move-request` query is parameterized by `?position` and `?player`, so we pass in the position argument supplied to `tile`, and `:o` for player, since the human player is always "O" in this game. If the session contains a `::MoveRequest` for the specified `position` (empty square) AND it is the human's turn to play, `rules/query-one` will return that `::MoveRequest`; otherwise it returns `nil`. That value is in turn passed to `click-handler`, which returns a function to handle a click event if there is a valid request (i.e. the square can be selected by the human player); otherwise it returns `nil`. `tile` similarly executes the queries for other relevant facts, providing information to render the `<td>` with conditional CSS classes and event handling.
 
 The core AI effector code is
 
