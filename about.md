@@ -6,20 +6,20 @@ permalink: /about/
 
 # Dave Dixon, Ph.D
 
-Founder and Chief Software Architect at [Compute Software](https://www.computesoftware.com)
+Senior Software Engineer II at Credit Karma
 
 [Resume](https://docs.google.com/document/d/1u4gCaPrv07PENzM8CI09y9BqJ29eRQmRL_rnnrfY6Is/edit?usp=sharing)
 
 ### Current tech stack
 * Clojure(Script)
-* Kafka
+* Scala
+* GCP
+* Apache Beam
 * Kubernetes
-* AWS
+* Kafka
 
-### Publication Lists
-* [https://www.researchgate.net/scientific-contributions/7329030_D_D_Dixon](https://www.researchgate.net/scientific-contributions/7329030_D_D_Dixon)
-* [https://www.researchgate.net/scientific-contributions/82646288_David_D_Dixon](https://www.researchgate.net/scientific-contributions/82646288_David_D_Dixon)
-* [https://www.researchgate.net/scientific-contributions/84991042_D_D_Dixon](https://www.researchgate.net/scientific-contributions/84991042_D_D_Dixon)
+### Publication List
+* [Dave Dixon publications](https://scholar.google.com/citations?view_op=list_works&hl=en&user=K82mUSsAAAA)
 
 ### Background
 * Coding since age 11 (40+ years).
@@ -31,7 +31,8 @@ Founder and Chief Software Architect at [Compute Software](https://www.computeso
   * Machine vision
   * Bioinformatics
   * Operations research/financial modeling
-  * General enterprise and SaaS software
+  * General enterprise and SaaS software/architecture
+  * Big data, ML/AI, analytics
 
 ### Contact me
 
