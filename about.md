@@ -6,7 +6,7 @@ permalink: /about/
 
 # Dave Dixon, Ph.D
 
-Senior Software Engineer II at Credit Karma
+Senior Infrastructure Software Engineer II at Credit Karma
 
 [Resume](https://docs.google.com/document/d/1u4gCaPrv07PENzM8CI09y9BqJ29eRQmRL_rnnrfY6Is/edit?usp=sharing)
 
