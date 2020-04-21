@@ -54,6 +54,7 @@ Some of this was transferred from 20+ year-old cassette tape, so forgive the aud
 #### Heavier
 * [Needle in my Eye](https://www.youtube.com/watch?v=VJPpemdDd10)
 * [Monkey Eat Dead Monkey Head](https://www.youtube.com/watch?v=f-NNkcqNp4s)
+* [The Fishy Song](https://www.youtube.com/watch?v=zoYNRVINV-c)
 
 #### Selections from the album Satanic Gizmo (not for the easily offended)
 * [Liar](https://www.youtube.com/watch?v=S7fNwkdGS9I)
