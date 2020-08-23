@@ -18,6 +18,8 @@ is a hypothesis, for which we gather evidence which updates the weight of belief
 in that hypothesis (and correspondingly the weight of the alternative, that the software is
 not correct).
 
+<!--more-->
+
 We want to be clear on the distinction, particularly in the outcome. If you can prove
 correctness via mathematic methods, you prove a statement of absolute truth, for 
 all possible inputs. The scientific approach leaves room for uncertainty. We might,
@@ -45,3 +47,30 @@ easy to write code that does stuff. That implies they also make it easy to write
 code that does the *wrong* stuff, hence efforts to bolt on things like static type
 systems, where we try to impose some set of constraints that will yield 
 mathematically provable statements about your code.
+
+But remember Rice's theorem: we can't generally prove non-trivial semantic properties
+of the program. That leaves syntactic properties, in other words, you can only 
+prove things about how the program is written, not what it will do when it runs.
+Which might go farther than you'd think, see e.g. some of the examples given in
+[this article](https://lexi-lambda.github.io/blog/2020/08/13/types-as-axioms-or-playing-god-with-static-types/).
+That said, real-world type systems generally go beyond the limits implied by
+staying in the realm of purely provable statements. As discussed in
+[Static Program Analysis](https://cs.au.dk/~amoeller/spa/), type checkers are
+generally approximations. And where they need to err, they try to do it on the
+conservative side, occasionally failing programs which are semantically correct
+but simply do not match the constraints of the type system,
+rather than passing programs which will fail. Now you know why you've spent
+hours scratching your head why the compiler kicks back code which clearly will
+run fine.
+
+Further, that conclusion does not account for the fact that
+["Typing is hard"](https://typing-is-hard.ch/). First, devising 
+a mathematically rigorous type calculus is difficult, moreso
+considering it has to work nicely with the actual programming
+language. Scala's type checker, for instance, is mathematically both 
+* Unsound:  Will accept incorrectly typed programs
+* Undecidable: Cannot determine type correctness for all programs in finite time
+
+Add to that the type checker is just another program.
+Who's verifying that program is correct? Can that even be verified
+in general?
