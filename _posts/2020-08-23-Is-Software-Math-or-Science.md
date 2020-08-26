@@ -82,15 +82,27 @@ None of this means that static type analysis can't be useful. It just isn't
 providing deep mathematic truths about your software. And that brings us back
 to the original question: is software correctness math or science? In 
 the common case, it's clearly science. THe question and its answer is not
-simply academic, but should be at the core of what software engineers do
-every day.We don't just create software, any more than scientists do nothing
-but create abstract hypotheses. We also must provide the evidence that our
+simply academic, but core to what software engineers do
+every day. We don't just create software, any more than scientists just
+create abstract hypotheses. We also must provide the evidence that our
 software is correct. The effort expended using various tools in that
 task must be informed by their utility. You wouldn't use a screwdriver to
-chop down a tree.
+chop down a tree. Nor should you find yourself using a tool that
+makes it difficult to ship code without providing some corresponding
+benefit of providing evidence of correctness.
 
 Treating software correctness as science rather than math allows
-us to broaden our view of what tools and techniques can be used.
+us to broaden our view of what tools and techniques can be used,
+and further allows for consideration of the effectiveness of those
+approaches, whether the benefits justify the costs.
 A common approach today would be to combine type safety (via static
 type analysis by the compiler), unit tests, and code coverage.
+Unit tests and code coverage clearly follow the scientific method.
+A test is an experiment, covergage tells you for which part of the code
+the result of that experiment provides evidence for correctness (or not).
+Static analysis a bit of a different flavor, but the end result is the
+same, providing evidence that certain classes of errors won't be
+encountered at runtime.
+
+
 Quantification
