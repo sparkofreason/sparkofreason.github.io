@@ -129,6 +129,7 @@ particularly when phrased in the language of science. Given
 * D is data gathered in experiments
 * I is prior information
 then Bayes' Theorem is written:
+
 P(H|D,I) = P(D|H,I) P(H|I) / P(D|I)
 
 The vertical bar means given, so in words this reads:
