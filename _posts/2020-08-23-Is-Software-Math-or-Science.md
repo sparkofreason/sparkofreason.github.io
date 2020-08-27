@@ -104,5 +104,39 @@ Static analysis a bit of a different flavor, but the end result is the
 same, providing evidence that certain classes of errors won't be
 encountered at runtime.
 
+Now suppose you were implementing an new monad instance. How would you
+verify that your implementation follows the [monad laws](https://wiki.haskell.org/Monad_laws)?
+These a clearly semantic properties, statements about what happens when code
+executes, not its syntactic structure. Since we're talking about "laws", we ideally
+would validate they are true for all possible inputs. But that is rarely
+practical. Unit tests as usually employed check one or perhaps a handful
+of possibilities, maybe better than nothing, but pretty weak science.
+
+Haskell's answer to this was *property based testing*, as embodied in
+[QuickCheck](https://begriffs.com/posts/2017-01-14-design-use-quickcheck.html).
+The article states "Of course the only way to truly guarantee properties of programs
+is by mathematical proof," but Rice's Theorem tells us this is undecidable, or best
+case when we have a finite input domain (say all double-precision floats), the
+"proof" would be running the program against every possible input. Property-based
+testing instead runs a large-ish subset of possible inputs, and checking that
+the results satisfy desired properties, like the monad laws. How large?
+Depends on how much evidence you need, combined with prior information about
+your code, like the level of evidence of correctness for library functions utilized 
+in the code under test. Property-based testing is, at least qualitatively, the
+embodiment of the application of [Bayes' Theorem](https://www.mathsisfun.com/data/bayes-theorem.html),
+particularly when phrased in the language of science. Given
+* H is the hypothesis under test, i.e. "program is correct"
+* D is data gathered in experiments
+* I is prior information
+then Bayes' Theorem is written:
+P(H|D,I) = P(D|H,I) P(H|I) / P(D|I)
+
+The vertical bar means given, so in words this reads:
+> The probability that your program is correct given the observed data and prior information
+is equal to the probability that you would observe that data GIVEN your program is correct
+and the prior information, times the probability that you thought your program was correct
+given ONLY the prior information, divided by the probability you would have seen the data anyway
+(this last bit is a normalizing factor which we often don't worry about, for reasons that will
+soon be obvious).
 
 Quantification
