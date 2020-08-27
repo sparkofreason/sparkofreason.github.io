@@ -128,11 +128,13 @@ particularly when phrased in the language of science. Given
 * H is the hypothesis under test, i.e. "program is correct"
 * D is data gathered in experiments
 * I is prior information
+
 then Bayes' Theorem is written:
 
-P(H|D,I) = P(D|H,I) P(H|I) / P(D|I)
+>P(H|D,I) = P(D|H,I) P(H|I) / P(D|I)
 
 The vertical bar means given, so in words this reads:
+
 > The probability that your program is correct given the observed data and prior information
 is equal to the probability that you would observe that data GIVEN your program is correct
 and the prior information, times the probability that you thought your program was correct
