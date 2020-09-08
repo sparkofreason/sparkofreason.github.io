@@ -125,21 +125,43 @@ your code, like the level of evidence of correctness for library functions utili
 in the code under test. Property-based testing is, at least qualitatively, the
 embodiment of the application of [Bayes' Theorem](https://www.mathsisfun.com/data/bayes-theorem.html),
 particularly when phrased in the language of science. Given
-* H is the hypothesis under test, i.e. "program is correct"
-* D is data gathered in experiments
-* I is prior information
+* *H* is the hypothesis under test, i.e. "program is correct"
+* *D* is data gathered in experiments, which we'll generalize to be "observations"
+about our program, e.g. static analysis results, test results, etc.
+* *I* is prior information
 
 then Bayes' Theorem is written:
 
->P(H|D,I) = P(D|H,I) P(H|I) / P(D|I)
+>*P(H|D,I) = P(D|H,I) P(H|I) / P(D|I)*
 
 The vertical bar means given, so in words this reads:
 
-> The probability that your program is correct given the observed data and prior information
-is equal to the probability that you would observe that data GIVEN your program is correct
+> The probability that your program is correct given the observations and prior information
+is equal to the probability that you would make those observations GIVEN your program is correct
 and the prior information, times the probability that you thought your program was correct
-given ONLY the prior information, divided by the probability you would have seen the data anyway
+given ONLY the prior information, divided by the probability you would have made the same observations
+regardless of correctness
 (this last bit is a normalizing factor which we often don't worry about, for reasons that will
 soon be obvious).
+
+That's a mouthful, so let's follow it through with an example. We'll start by nailing
+down what *H* should be. "Program is correct" will generally break down into a set of 
+more specific properties, things like the monad laws, or "no exceptions crash the program."
+Each property can be considered its own hypothesis, and "correctness" just the logical AND
+of those properties. 
+
+Let's focus on "no exceptions" as our example. The *P(H|I)* term is called the *prior*.
+Where does the prior come from? Before you've made any observations, the prior reflects
+the degree of belief you have that your program is correct. Presumably that's not high,
+otherwise you wouldn't bother with analysis or testing ;-) The first observation you
+might make is compiler output. If your compiler includes some sort of static analyses,
+then positive results inform the prior, since you have a stronger belief that at least
+some exception types are less likely to occur given successful static analysis. The
+obvious example is static type analysis. If your program passes static type analysis,
+it is more likely that it will not throw `TypeMismatchException`'s when run.
+
+*P(D|H,I)* is the *likelihood*, the probability that running our program would result
+in observations *D* given the hypothesis and prior information.
+
 
 Quantification
