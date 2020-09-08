@@ -134,34 +134,39 @@ then Bayes' Theorem is written:
 
 >*P(H|D,I) = P(D|H,I) P(H|I) / P(D|I)*
 
+The *P* here means "probability", but should be interpreted more as "belief", the
+degree that you believe a statement, expressed as a value between 0 (absolutely false) 
+and 1 (absolutely true). 
 The vertical bar means given, so in words this reads:
 
-> The probability that your program is correct given the observations and prior information
-is equal to the probability that you would make those observations GIVEN your program is correct
-and the prior information, times the probability that you thought your program was correct
-given ONLY the prior information, divided by the probability you would have made the same observations
-regardless of correctness
-(this last bit is a normalizing factor which we often don't worry about, for reasons that will
-soon be obvious).
+> The belief that your program is correct given the observations and prior information
+is equal to the belief that you would make those observations GIVEN your program is correct
+and the prior information, times the belief that you thought your program was correct
+given ONLY the prior information, divided by the belief you would have made the same observations
+regardless of correctness.
 
-That's a mouthful, so let's follow it through with an example. We'll start by nailing
-down what *H* should be. "Program is correct" will generally break down into a set of 
-more specific properties, things like the monad laws, or "no exceptions crash the program."
-Each property can be considered its own hypothesis, and "correctness" just the logical AND
-of those properties. 
+The details of what this means and how it might be employed are beyond the scope
+of what I want to write here. Indeed, many volumes have been written, and
+Bayes' Theorem has been "rediscovered" many times throughout history
+(see [The Theorem That Would Not Die](https://www.amazon.com/Theory-That-Would-Not-Die/dp/0300188226)).
+This is not some esoteric statistics formula, but the mathematical expression
+of *scientific* reasoning. Mathematical reasoning deals with absolutes, statements
+are either true or false, and we use axioms and the tools of logic to attempt to prove statements
+either way. Science deals with degrees of belief, a spectrum between true and false, informed
+by our beliefs and observations. Bayes' Theorem is a key tool in reasoning with degrees
+of beliefs, and reflects how people actually think about the real world, where
+mathematical purity is rarely applicable.
 
-Let's focus on "no exceptions" as our example. The *P(H|I)* term is called the *prior*.
-Where does the prior come from? Before you've made any observations, the prior reflects
-the degree of belief you have that your program is correct. Presumably that's not high,
-otherwise you wouldn't bother with analysis or testing ;-) The first observation you
-might make is compiler output. If your compiler includes some sort of static analyses,
-then positive results inform the prior, since you have a stronger belief that at least
-some exception types are less likely to occur given successful static analysis. The
-obvious example is static type analysis. If your program passes static type analysis,
-it is more likely that it will not throw `TypeMismatchException`'s when run.
+Let's take a brief qualitative example:
+* *H* is the property that our program never crashes with an unhandled exception.
+* *I* is some combination of our knowledge about the code, and results of static type analysis
+by the compiler.
+* *D* is observations we make by running tests, i.e. does the program crash for a given test?
 
-*P(D|H,I)* is the *likelihood*, the probability that running our program would result
-in observations *D* given the hypothesis and prior information.
+Translating to Bayes' Theorem:
 
-
-Quantification
+> The belief that the program never crashes with an unhandled exeception given the test
+results and our knowledge of the code and static analysis results is equal to:
+* The belief that we would have seen those test results given that our program never crashes
+and our prior knowledge/analysis,
+* Multiplied by the belief that our program would never
