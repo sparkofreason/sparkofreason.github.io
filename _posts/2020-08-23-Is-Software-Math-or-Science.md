@@ -163,10 +163,20 @@ Let's take a brief qualitative example:
 by the compiler.
 * *D* is observations we make by running tests, i.e. does the program crash for a given test?
 
-Translating to Bayes' Theorem:
-
-> The belief that the program never crashes with an unhandled exeception given the test
+Translating to Bayes' Theorem: The belief that the program never crashes with an unhandled exeception given the test
 results and our knowledge of the code and static analysis results is equal to:
 * The belief that we would have seen those test results given that our program never crashes
 and our prior knowledge/analysis,
-* Multiplied by the belief that our program would never
+* Multiplied by the belief that our program would never crashes given only the prior information,
+* Divided by the belief that we would have seen the test results regardless of whether our program
+crashes.
+
+Don't overthink the quantitative aspects, like how you will assign number to these various
+beliefs. It's hard in general, and hasn't really received a lot of attention for
+these types of software problems. Instead focus on the qualitative method that follows
+for updating beliefs about program correctness, based on whatever *I* and *D* we
+might have. The page about Bayes' Theorem linked above has some good examples to give the
+flavor, particularly the one about the probability of fire given that you see smoke,
+which should have some obvious correspondence with our software example here.
+
+
