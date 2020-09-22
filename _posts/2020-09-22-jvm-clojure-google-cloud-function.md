@@ -80,7 +80,6 @@ import com.google.cloud.functions.HttpResponse;
 import com.google.cloud.functions.HttpFunction;
 import clojure.java.api.Clojure;
 import clojure.lang.IFn;
-import java.io.IOException;
 
 public class MyCloudFn implements HttpFunction {
 
@@ -93,7 +92,7 @@ public class MyCloudFn implements HttpFunction {
   
   @Override
   public void service(HttpRequest request, HttpResonse response)
-    throws IOException {
+    throws Exception {
     service_impl.invoke(request, response);
   }
 }
@@ -110,7 +109,7 @@ looks like this:
 
 1. Call `java -c` on the java file, output the class to some folder like "classes".
 2. Build an uberjar using some Clojure tool (I used [depstar](https://github.com/seancorfield/depstar))
-including the "classes" (or whatever) directory in the classpath (e.g. `:extra-paths ["classes"] 
+including the "classes" (or whatever) directory in the classpath (e.g. `:extra-paths ["classes"]` 
 in a `:build` alias if using `deps.edn`).
 3. In your CLI, go to the folder containing the uberjar.
 4. Use the [`gcloud functions deploy` command](https://cloud.google.com/functions/docs/deploying/filesystem#deploy_using_the_gcloud_tool)
@@ -118,3 +117,8 @@ to deploy your cloud function.
 5. Test with `curl` or whatever, `POST`ing some JSON for the body. You should see `ok` returned as the result, and whatever
 you sent for the body printed in the Stackdriver logs.
 
+The `Could not locate clojure/core__init.class` error can be mysterious in this type of interop
+scenario, so hopefully if you run into that case, this post will save you some time. Note that I just through
+this together quickly from memory, at some point I'll make a little example repo and update this
+post. If you try the code before and find errors before I get that done, please DM @sparkofreason on
+the clojurians slack.
