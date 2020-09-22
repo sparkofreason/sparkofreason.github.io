@@ -1,0 +1,52 @@
+---
+layout: post
+title: 'Using JVM Clojure for Google Cloud Functions'
+excerpt_separator: <!--more-->
+published: false
+---
+
+I recently ran into a requirement where a Google Cloud Function (GCF) seemed a good fit.
+I wanted to use Clojure for this, at least as a first cut, but the examples I found
+were centered around ClojureScript/NodeJS, which wound up being a non-starter
+for various boring reasons. Googling about turned up essentially nothing about
+how to use JVM Clojure for this purpose. The GCF story for Java is about as
+easy as it can get, just implement a known interface, uberjar,
+and deploy with the `gcloud` tool. 
+
+My first attempt in Clojure used `gen-class`, but deployment resulted in this
+exception:
+
+```
+"Exception in thread "main" java.lang.ExceptionInInitializerError
+	at clojure.lang.Namespace.<init>(Namespace.java:34)
+	at clojure.lang.Namespace.findOrCreate(Namespace.java:176)
+	at clojure.lang.Var.internPrivate(Var.java:156)
+	at ck.proxysql_notifier.<clinit>(Unknown Source)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:62)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:490)
+	at com.google.cloud.functions.invoker.NewHttpFunctionExecutor.forClass(NewHttpFunctionExecutor.java:51)
+	at com.google.cloud.functions.invoker.runner.Invoker.startServer(Invoker.java:243)
+	at com.google.cloud.functions.invoker.runner.Invoker.main(Invoker.java:129)
+Caused by: java.io.FileNotFoundException: Could not locate clojure/core__init.class, clojure/core.clj or clojure/core.cljc on classpath.
+	at clojure.lang.RT.load(RT.java:462)
+	at clojure.lang.RT.load(RT.java:424)
+	at clojure.lang.RT.<clinit>(RT.java:338)
+	... 11 more" 
+```
+
+First step was to verify that `clojure/core__int.class' made it in the jar. It was.
+Next guess was some kind of class loader issue. I've actually run into this issue several
+times, where some service requires a Java class implementation, said service uses its
+own class loader, and when the class is loaded you run afoul of the way Clojure uses
+class loaders to support its dynamic features. Given that I've hit this problem
+more than once, it's surprising how little is written about it.
+[This post](https://groups.google.com/g/clojure/c/Aa04E9aJRog/m/f0CXZCN1z0AJ) reminded me
+of how I had solved this problem in the past, using `setContextClassLoader`. And 
+[this Slack thread](https://clojurians-log.clojureverse.org/clojure/2020-02-03)
+further reminded me that my past solutions used a simple "shim" class, because
+the class loader needs to be set before the Clojure runtime is loaded. Since I
+hit this problem infrequently enough to forget the solution between instances,
+I thought I would document it here.
+
