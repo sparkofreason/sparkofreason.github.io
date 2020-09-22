@@ -51,9 +51,10 @@ more than once, it's surprising how little is written about it.
 of how I had solved this problem in the past, using `setContextClassLoader`. And 
 [this Slack thread](https://clojurians-log.clojureverse.org/clojure/2020-02-03)
 further reminded me that my past solutions used a simple "shim" class, because
-the class loader needs to be set before the Clojure runtime is loaded. Since I
-hit this problem infrequently enough to forget the solution between instances,
-I thought I would document it here.
+the class loader needs to be set before the Clojure runtime is loaded.
+I thought I should document the solution here,
+since I
+encounter this problem infrequently enough to forget the solution between instances.
 
 This solution is specific to implementing a GCF in Clojure, but the general pattern
 holds in other cases, which is to implement whatever interfaces the service or
