@@ -50,3 +50,71 @@ the class loader needs to be set before the Clojure runtime is loaded. Since I
 hit this problem infrequently enough to forget the solution between instances,
 I thought I would document it here.
 
+This solution is specific to implementing a GCF in Clojure, but the general pattern
+holds in other cases, which is to implement whatever interfaces the service or
+framework requires as a Java class which calls into Clojure code which
+implements the actual logic. Here's the Clojure:
+
+```clojure
+(ns sparkofreason.cloud-function
+  (:require [cheshire.core :as json]
+  (:import (com.google.cloud.functions HttpRequest HttpResponse))
+  
+(defn service
+  [^HttpRequest request ^HttpResponse response]
+  (let [body (json/parse-stream (.getReader request))
+        response-writer (.getWriter response)]
+    (println "Received " body)
+    (.write response-writer "ok")))
+```
+
+Pretty boring stuff, deserialize the request body JSON, print it out (which
+will appear in the Stackdriver logs), and return "ok" for the response. The
+Java wrapper looks like this:
+
+```java
+package com.sparkofreason.cloud_function;
+
+import com.google.cloud.functions.HttpRequest;
+import com.google.cloud.functions.HttpResponse;
+import com.google.cloud.functions.HttpFunction;
+import clojure.java.api.Clojure;
+import clojure.lang.IFn;
+import java.io.IOException;
+
+public class MyCloudFn implements HttpFunction {
+
+  static {
+    Thread.currentThread().setContextClassLoader(MyCloudFn.class.getClassLoader());
+    IFn require = Clojure.var("clojure.core", "require");
+    require.invoke(Clojure.read("sparkofreason.cloud-function");
+  }
+  private static final service_impl = Clojure.var("sparkofreason.cloud-function", "service");
+  
+  @Override
+  public void service(HttpRequest request, HttpResonse response)
+    throws IOException {
+    service_impl.invoke(request, response);
+  }
+}
+```
+
+For the interop, I'm just following [Alex Miller's example of calling Clojure from Java](https://github.com/puredanger/clojure-from-java).
+The key part is the call to `setContextClassLoader`. We put this in the static
+constructor *before* any Clojure stuff happens, to ensure the class loader is
+set so that our service or framework will have visibility to the classes which
+get loaded when you start poking at `clojure.java.api.Clojure`.
+
+You'll then need to build and deploy this to your service/framework, which for GCF
+looks like this:
+
+1. Call `java -c` on the java file, output the class to some folder like "classes".
+2. Build an uberjar using some Clojure tool (I used [depstar](https://github.com/seancorfield/depstar))
+including the "classes" (or whatever) directory in the classpath (e.g. `:extra-paths ["classes"] 
+in a `:build` alias if using `deps.edn`).
+3. In your CLI, go to the folder containing the uberjar.
+4. Use the [`gcloud functions deploy` command](https://cloud.google.com/functions/docs/deploying/filesystem#deploy_using_the_gcloud_tool)
+to deploy your cloud function.
+5. Test with `curl` or whatever, `POST`ing some JSON for the body. You should see `ok` returned as the result, and whatever
+you sent for the body printed in the Stackdriver logs.
+
