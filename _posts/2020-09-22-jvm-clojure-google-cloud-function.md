@@ -36,6 +36,8 @@ Caused by: java.io.FileNotFoundException: Could not locate clojure/core__init.cl
 	... 11 more" 
 ```
 
+<!--more-->
+
 First step was to verify that `clojure/core__int.class` made it in the jar. It did.
 Next guess was some kind of class loader issue. I've actually run into this scenario
 several
