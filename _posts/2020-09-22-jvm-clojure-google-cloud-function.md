@@ -55,8 +55,8 @@ I thought I would document it here.
 
 This solution is specific to implementing a GCF in Clojure, but the general pattern
 holds in other cases, which is to implement whatever interfaces the service or
-framework requires as a Java class which calls into Clojure code which
-implements the actual logic. Here's the Clojure:
+framework requires as a Java class, which in turn  calls into Clojure code 
+implementing the actual logic. Here's the Clojure:
 
 ```clojure
 (ns sparkofreason.cloud-function
