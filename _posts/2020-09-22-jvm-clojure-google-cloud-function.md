@@ -37,10 +37,13 @@ Caused by: java.io.FileNotFoundException: Could not locate clojure/core__init.cl
 ```
 
 First step was to verify that `clojure/core__int.class` made it in the jar. It did.
-Next guess was some kind of class loader issue. I've actually run into this issue several
+Next guess was some kind of class loader issue. I've actually run into this scenario
+several
 times, where some service requires a Java class implementation, said service uses its
 own class loader, and when the class is loaded you run afoul of the way Clojure uses
-class loaders to support its dynamic features. Given that I've hit this problem
+class loaders to support its dynamic features. It can be confusing, because it's clear
+that the Clojure classes are available in the uberjar, but you get an error that
+they're not found. Given that I've hit this problem
 more than once, it's surprising how little is written about it.
 [This post](https://groups.google.com/g/clojure/c/Aa04E9aJRog/m/f0CXZCN1z0AJ) reminded me
 of how I had solved this problem in the past, using `setContextClassLoader`. And 
