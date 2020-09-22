@@ -36,7 +36,7 @@ Caused by: java.io.FileNotFoundException: Could not locate clojure/core__init.cl
 	... 11 more" 
 ```
 
-First step was to verify that `clojure/core__int.class' made it in the jar. It was.
+First step was to verify that `clojure/core__int.class` made it in the jar. It did.
 Next guess was some kind of class loader issue. I've actually run into this issue several
 times, where some service requires a Java class implementation, said service uses its
 own class loader, and when the class is loaded you run afoul of the way Clojure uses
