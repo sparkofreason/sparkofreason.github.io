@@ -2,7 +2,7 @@
 layout: post
 title: 'Using JVM Clojure for Google Cloud Functions'
 excerpt_separator: <!--more-->
-published: false
+published: true
 ---
 
 I recently ran into a requirement where a Google Cloud Function (GCF) seemed a good fit.
