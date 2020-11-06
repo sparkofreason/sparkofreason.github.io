@@ -106,7 +106,7 @@ encountered at runtime.
 
 Now suppose you were implementing an new monad instance. How would you
 verify that your implementation follows the [monad laws](https://wiki.haskell.org/Monad_laws)?
-These a clearly semantic properties, statements about what happens when code
+These are clearly semantic properties, statements about what happens when code
 executes, not its syntactic structure. Since we're talking about "laws", we ideally
 would validate they are true for all possible inputs. But that is rarely
 practical. Unit tests as usually employed check one or perhaps a handful
@@ -171,7 +171,7 @@ and our prior knowledge/analysis,
 * Divided by the belief that we would have seen the test results regardless of whether our program
 crashes.
 
-Don't overthink the quantitative aspects, like how you will assign number to these various
+Don't overthink the quantitative aspects, like how you will assign numbers to these various
 beliefs. It's hard in general, and hasn't really received a lot of attention for
 these types of software problems. Instead focus on the qualitative method that follows
 for updating beliefs about program correctness, based on whatever *I* and *D* we
